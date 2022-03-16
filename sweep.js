@@ -12,49 +12,53 @@ export async function main(ns) {
 	let servers = [];
 	let slist = dpList(ns);
 	for (let s of slist) {
-		if (!s.startsWith("pserv-") && !s.isHome) {
-			servers.push(new HackableBaseServer(ns, s))
-		}
+		servers.push(new HackableBaseServer(ns, s))
 	}
 
 	while (true) {
 		for (let server of servers) {
+			if (server.purchased || server.isHome) {
+				continue;
+			}
+			let unlocked = false;
 			let serverInfoGiven = false;
 			// Gain admin on all servers that we can
 			if (!server.admin && server.ports.required <= player.ports) {
 				server.sudo();
 				if (server.admin) {
-					ns.print(`SUCCESS\tServer: ${server.id} Now Unlocked!`);
-					serverInfoGiven = true;
+					unlocked = true;
 				}
 			}
-			if (server.admin && !server.backdoored) {
-				ns.print(`ERROR\tRun Backdoor @ ${server.id}`);
-				serverInfoGiven = true;
-			} else if (!server.admin) {
-				ns.print(`ERROR\tServer: ${server.id} is Locked.`);
+			
+			if (server.money.max != 0) {
+				let securityRating = (server.security.level - server.security.min).toFixed(2);
+				let saturation = (server.money.available / server.money.max * 100).toFixed(2);
+				let moneymax = ns.nFormat(server.money.max, "$0.000a");
+				let variant = "ERROR";
+				let icon = "☠️";
+				if (saturation != 100.00 && securityRating < 2) {
+					variant = "SUCCESS";
+					icon = "🌱";
+				} else if (saturation == 100 && securityRating < 1) {
+					variant = "INFO";
+					icon = "💵";
+				}
+				
+				ns.print(
+					`${variant}\t${
+						!server.admin ? " 🔒" : unlocked ? " 🔑" : "   "
+					}${	!server.backdoored ? "🚪" : "  "
+					}(${securityRating}) [${saturation}% of ${moneymax}] \t${icon} @ ${server.id}`
+				);
 				serverInfoGiven = true;
 			}
+
 			if (!serverInfoGiven) {
-				if (server.money.max != 0) {
-					let securityRating = (server.security.level - server.security.min).toFixed(2);
-					let saturation = (server.money.available / server.money.max * 100).toFixed(2);
-					let moneymax = ns.nFormat(server.money.max, "$0.000a");
-					let variant = "ERROR";
-					let icon = "☠️";
-					if (saturation != 100.00 && securityRating < 2) {
-						variant = "SUCCESS";
-						icon = "🌱";
-					} else if (saturation == 100 && securityRating < 1) {
-						variant = "INFO";
-						icon = "💵";
-					}
-					
-					ns.print(`${variant}\t(${securityRating})\t[${saturation}% of ${moneymax}]\t${icon} @ ${server.id}`);
-				}
+				//ns.print(`Server: ${server.id}`);
+				await ns.sleep(1);
+			} else {
+				await ns.sleep(1000);
 			}
 		}
-
-		await ns.sleep(1000);
 	}
 }

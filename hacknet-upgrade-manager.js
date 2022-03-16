@@ -10,7 +10,7 @@ const argsSchema = [
     ['continuous', false],
     ['interval', 1000], // Rate at which the program purchases upgrades when running continuously
     ['max-spend', Number.MAX_VALUE], // The maximum amount of money to spend on upgrades
-    ['toast', false] // Set to true to toast purchases
+    ['toast', true] // Set to true to toast purchases
 ];
 
 export function autocomplete(data, _) {
