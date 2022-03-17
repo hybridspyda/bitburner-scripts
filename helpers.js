@@ -18,6 +18,8 @@ const symbols = ["", "k", "m", "b", "t", "q", "Q", "s", "S", "o", "n", "e33", "e
 * @param {number=} maxDecimalPlaces - (default: 3) The maximum decimal places you wish to see, regardless of significant figures. (e.g. 12.3, 1.2, 0.1 all have 1 decimal)
 **/
 export function formatNumberShort(num, maxSignificantFigures = 6, maxDecimalPlaces = 3) {
+  if (Math.abs(num) > 10 ** (3 * symbols.length)) // If we've exceeded our max symbol, switch to exponential notation
+      return num.toExponential(Math.min(maxDecimalPlaces, maxSignificantFigures - 1));
   for (var i = 0, sign = Math.sign(num), num = Math.abs(num); num >= 1000 && i < symbols.length; i++) num /= 1000;
   // TODO: A number like 9.999 once rounted to show 3 sig figs, will become 10.00, which is now 4 sig figs.
   return ((sign < 0) ? "-" : "") + num.toFixed(Math.max(0, Math.min(maxDecimalPlaces, maxSignificantFigures - Math.floor(1 + Math.log10(num))))) + symbols[i];
@@ -175,7 +177,7 @@ export async function getNsDataThroughFile_Custom(ns, fnRun, fnIsAlive, command,
 */
 export async function runCommand(ns, command, fileName, verbose = false, maxRetries = 5, retryDelayMs = 50, ...args) {
   checkNsInstance(ns, '"runCommand"');
-  if (!verbose) disableLogs(ns, ['run', 'sleep']);
+  if (!verbose) disableLogs(ns, ['run', 'asleep']);
   return await runCommand_Custom(ns, ns.run, command, fileName, verbose, maxRetries, retryDelayMs, ...args);
 }
 
@@ -219,12 +221,12 @@ export async function waitForProcessToComplete(ns, pid, verbose) {
 **/
 export async function waitForProcessToComplete_Custom(ns, fnIsAlive, pid, verbose) {
   checkNsInstance(ns, '"waitForProcessToComplete_Custom"');
-  if (!verbose) disableLogs(ns, ['sleep']);
+  if (!verbose) disableLogs(ns, ['asleep']);
   // Wait for the PID to stop running (cheaper than e.g. deleting (rm) a possibly pre-existing file and waiting for it to be recreated)
   for (var retries = 0; retries < 1000; retries++) {
       if (!fnIsAlive(pid)) break; // Script is done running
       if (verbose && retries % 100 === 0) ns.print(`Waiting for pid ${pid} to complete... (${retries})`);
-      await ns.sleep(10);
+      await ns.asleep(10);
   }
   // Make sure that the process has shut down and we haven't just stopped retrying
   if (fnIsAlive(pid)) {
@@ -251,7 +253,7 @@ export async function autoRetry(ns, fnFunctionThatMayFail, fnSuccessCondition, e
           const errorLog = `${fatal ? 'FAIL' : 'WARN'}: (${maxRetries} retries remaining): ${String(error)}`
           log(ns, errorLog, fatal, !verbose ? undefined : (fatal ? 'error' : 'warning'))
           if (fatal) throw error;
-          await ns.sleep(retryDelayMs);
+          await ns.asleep(retryDelayMs);
           retryDelayMs *= backoffRate;
       }
   }
