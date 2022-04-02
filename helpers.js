@@ -149,6 +149,8 @@ export async function getNsDataThroughFile_Custom(ns, fnRun, fnIsAlive, command,
   const commandHash = hashCode(command);
   fName = fName || `/Temp/${commandHash}-data.txt`;
   const fNameCommand = (fName || `/Temp/${commandHash}-command`) + '.js'
+  // Defend against stale data by pre-writing the file with invalid data TODO: Remove if this condition is never encountered
+  await ns.write(fName, "STALE", 'w');
   // Prepare a command that will write out a new file containing the results of the command
   // unless it already exists with the same contents (saves time/ram to check first)
   // If an error occurs, it will write an empty file to avoid old results being misread.
@@ -161,8 +163,11 @@ export async function getNsDataThroughFile_Custom(ns, fnRun, fnIsAlive, command,
   await waitForProcessToComplete_Custom(ns, fnIsAlive, pid, verbose);
   if (verbose) ns.print(`Process ${pid} is done. Reading the contents of ${fName}...`);
   // Read the file, with auto-retries if it fails
-  const fileData = await autoRetry(ns, () => ns.read(fName), f => f !== undefined && f !== "",
-      () => `ns.read('${fName}') somehow returned undefined or an empty string`,
+  let lastRead;
+  const fileData = await autoRetry(ns, () => ns.read(fName), f => (lastRead = f) !== undefined && f !== "" && f !== "STALE",
+      () => `ns.read('${fName}') returned no result ("${lastRead}") (command likely failed to run).` +
+          `\n  Command: ${command}\n  Script: ${fNameCommand}` +
+          `\nEnsure you have sufficient free RAM to run this temporary script.`,
       maxRetries, retryDelayMs, undefined, verbose);
   if (verbose) ns.print(`Read the following data for command ${command}:\n${fileData}`);
   return JSON.parse(fileData); // Deserialize it back into an object/array and return
@@ -177,7 +182,7 @@ export async function getNsDataThroughFile_Custom(ns, fnRun, fnIsAlive, command,
 */
 export async function runCommand(ns, command, fileName, verbose = false, maxRetries = 5, retryDelayMs = 50, ...args) {
   checkNsInstance(ns, '"runCommand"');
-  if (!verbose) disableLogs(ns, ['run', 'asleep']);
+  if (!verbose) disableLogs(ns, ['run']);
   return await runCommand_Custom(ns, ns.run, command, fileName, verbose, maxRetries, retryDelayMs, ...args);
 }
 
@@ -189,6 +194,7 @@ export async function runCommand(ns, command, fileName, verbose = false, maxRetr
 **/
 export async function runCommand_Custom(ns, fnRun, command, fileName, verbose = false, maxRetries = 5, retryDelayMs = 50, ...args) {
   checkNsInstance(ns, '"runCommand_Custom"');
+  if (!verbose) disableLogs(ns, ['asleep']);
   let script = `import { formatMoney, formatNumberShort, formatDuration, parseShortNumber, scanAllServers } fr` + `om '${getFilePath('helpers.js')}'\n` +
       `export async function main(ns) { try { ` +
       (verbose ? `let output = ${command}; ns.tprint(output)` : command) +
@@ -196,8 +202,15 @@ export async function runCommand_Custom(ns, fnRun, command, fileName, verbose = 
   fileName = fileName || `/Temp/${hashCode(command)}-command.js`;
   // To improve performance and save on garbage collection, we can skip writing this exact same script was previously written (common for repeatedly-queried data)
   if (ns.read(fileName) != script) await ns.write(fileName, script, "w");
+  // Wait for the script to appear (game can be finicky on actually completing the write)
+  await autoRetry(ns, () => ns.read(fileName), contents => contents == script,
+      () => `Temporary script ${fileName} is not available, despite having written it. (Did a competing process delete or overwrite it?)`,
+      maxRetries, retryDelayMs, undefined, verbose);
+  // Run the script, now that we're sure it is in place
   return await autoRetry(ns, () => fnRun(fileName, ...args), temp_pid => temp_pid !== 0,
-      () => `Run command returned no pid.\n  Destination: ${fileName}\n  Command: ${command}\nEnsure you have sufficient free RAM to run this temporary script.`,
+      () => `Run command returned no pid (command likely failed to run).` +
+          `\n  Command: ${command}\n  Temp Script: ${fileName}` +
+          `\nEnsure you have sufficient free RAM to run this temporary script.`,
       maxRetries, retryDelayMs, undefined, verbose);
 }
 
