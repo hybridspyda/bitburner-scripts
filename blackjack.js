@@ -1,26 +1,39 @@
-import { getFilePath, waitForProcessToComplete } from './helpers.js'
+import { getFilePath, waitForProcessToComplete, getActiveSourceFiles, getNsDataThroughFile } from './helpers.js'
 
 let doc = eval("document");
 /** @param {NS} ns 
  *  Super recommend you kill all other scripts before starting this up. **/
 export async function main(ns) {
 	// Step 1: Route to the blackjack screen. (I opted to pay the 4 GB RAM to have this be instant and fool-proof as possible)
+	const ownedSourceFiles = await getActiveSourceFiles(ns);
 	if (ns.getPlayer().city != "Aevum") {
-		if (!ns.travelToCity("Aevum"))
+		if (!(4 in ownedSourceFiles))
+			return ns.tprint("ERROR: You must manually travel to to Aevum to use this script.");
+		if (ns.getPlayer().money < 200000 || !(await getNsDataThroughFile(ns, 'ns.travelToCity("Aevum")', '/Temp/travel-to-city.txt')))
 			return ns.tprint("ERROR: Sorry, you need at least 200k to travel to the casino.");
 	}
-	ns.goToLocation("Iker Molina Casino");
+	if (!(4 in ownedSourceFiles) || !(await getNsDataThroughFile(ns, 'ns.goToLocation("Iker Molina Casino")', '/Temp/go-to-location.txt'))) {
+		let btnGoToCasino = find("//span[@aria-label = 'Iker Molina Casino']");
+		if (!btnGoToCasino) {// TODO: Need an automatic way to navigate to the CITY screen
+			ns.tprint("INFO: Quick! Click the City tab. You have 5 seconds...")
+			await ns.asleep(5000);
+			btnGoToCasino = find("//span[@aria-label = 'Iker Molina Casino']");
+		}
+		await click(btnGoToCasino);
+	}
 	const btnBlackjack = find("//button[contains(text(), 'blackjack')]");
+	if (!btnBlackjack) return tprint("ERROR: Attempt to automatically navigate to the Casino appears to have failed.");
 	await click(btnBlackjack);
 	// Step 2: Get some buttons we will need
 	const inputWager = find("//input[@value = 1000000]");
 	const btnStartGame = find("//button[text() = 'Start']");
 	const btnSaveGame = find("//button[@aria-label = 'save game']");
 	// Step 3: Save the fact that this script is now running, so that future reloads start this script back up immediately.
-	if (ns.ps("home").some(p => p.filename.includes("/Temp/"))) // Do a little clean-up to speed up save/load.
+	if (ns.ls("home", "/Temp/").length > 0) // Do a little clean-up to speed up save/load.
 		await waitForProcessToComplete(ns, ns.run(getFilePath('cleanup.js')));
+	await ns.sleep(5); // Anecdotally, some users report the first save is "stale" (doesn't include blackjack.js running). Maybe this delay helps?
 	await click(btnSaveGame);
-	await ns.sleep(10); // Give the game a little time to complete the save
+	await ns.sleep(5); // Assume the game didn't save instantly and give it some time
 	while (true) {
 		const bet = Math.min(1E8, ns.getPlayer().money * 0.9 /* Avoid timing issues with other scripts spending money */);
 		await setText(inputWager, `${bet}`);
@@ -49,7 +62,7 @@ export async function main(ns) {
 			return await ns.sleep(10000); // Keep the script alive to be safe. Presumably the page reloads before this completes.
 		}
 		await click(btnSaveGame); // Save if we won
-		await ns.sleep(10); // Give the game a little time to complete the save
+		await ns.sleep(10); // Assume the game didn't save instantly and give it some time
 	}
 }
 // Some DOM helpers (partial credit to ShamesBond)
