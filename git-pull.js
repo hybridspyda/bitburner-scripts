@@ -1,8 +1,8 @@
 let options;
 const argsSchema = [
-    ['github', 'hybridspyda'],
+    ['github', 'alainbryden'],
     ['repository', 'bitburner-scripts'],
-    ['branch', 'master'],
+    ['branch', 'main'],
     ['download', []], // By default, all supported files in the repository will be downloaded. Override with just a subset of files here
     ['new-file', []], // If a repository listing fails, only files returned by ns.ls() will be downloaded. You can add additional files to seek out here.
     ['subfolder', ''], // Can be set to download to a sub-folder that is not part of the remote repository structure
@@ -24,7 +24,7 @@ export function autocomplete(data, args) {
  * - Backing up your save / scripts first (try `download *` in the terminal)
  * - Ensuring you have no local changes that you don't mind getting overwritten
  * TODO: Some way to list all files in the repository and/or download them all. **/
- export async function main(ns) {
+export async function main(ns) {
     options = ns.flags(argsSchema);
     if (options.subfolder && !options.subfolder.startsWith('/'))
         options.subfolder = '/' + options.subfolder; // Game requires folders to have a leading slash. Add one if it's missing.
