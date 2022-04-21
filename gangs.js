@@ -1,14 +1,14 @@
-import { formatMoney, formatNumberShort, getNsDataThroughFile, getActiveSourceFiles, runCommand, tryGetBitNodeMultipliers, formatDuration } from './helpers.js'
+import { formatMoney, formatNumberShort, instanceCount, getNsDataThroughFile, getActiveSourceFiles, runCommand, tryGetBitNodeMultipliers, formatDuration } from './helpers.js'
 
 // Global config
 const updateInterval = 200; // We can improve our timing by updating more often than gang stats do (which is every 2 seconds for stats, every 20 seconds for territory)
 const wantedPenaltyThreshold = 0.0001; // Don't let the wanted penalty get worse than this
-let defaultMaxSpendPerTickTransientEquipment = 0.002; // If the --equipment-budget is not specified, spend up to this percent of non-reserved cash on temporary upgrades (equipment)
-let defaultMaxSpendPerTickPermanentEquipment = 0.2; // If the --augmentation-budget is not specified, spend up to this percent of non-reserved cash on permanent member upgrades
 const offStatCostPenalty = 50; // Equipment that doesn't contribute to our main stats suffers a percieved cost penalty of this multiple
+const defaultMaxSpendPerTickTransientEquipment = 0.002; // If the --equipment-budget is not specified, spend up to this percent of non-reserved cash on temporary upgrades (equipment)
+const defaultMaxSpendPerTickPermanentEquipment = 0.2; // If the --augmentation-budget is not specified, spend up to this percent of non-reserved cash on permanent member upgrades
 
 // Territory-related variables
-const gangsByPower = ["Speakers for the Dead", "The Dark Army", "The Syndicate", "Slum Snakes", /* Hack gangs don't scale as far */ "The Black Hand", /* "NiteSec" Been there, not fun. */]
+const gangsByPower = ["Speakers for the Dead", "The Dark Army", "The Syndicate", "Tetrads", "Slum Snakes", /* Hack gangs don't scale as far */ "The Black Hand", /* "NiteSec" Been there, not fun. */]
 const territoryEngageThreshold = 0.60; // Minimum average win chance (of gangs with territory) before we engage other clans
 let territoryTickDetected = false;
 let territoryTickTime = 20000; // Est. milliseconds until territory *ticks*. Can vary if processing offline time
@@ -63,6 +63,7 @@ export function autocomplete(data, _) {
 
 /** @param {NS} ns **/
 export async function main(ns) {
+    if (await instanceCount(ns) > 1) return; // Prevent multiple instances of this script from being started, even with different args.
     ownedSourceFiles = await getActiveSourceFiles(ns);
     const sf2Level = ownedSourceFiles[2] || 0;
     if (sf2Level == 0)
@@ -72,7 +73,10 @@ export async function main(ns) {
     log(ns, "Starting main loop...");
     while (true) {
         try { await mainLoop(ns); }
-        catch (err) { log(ns, `ERROR: Caught an unhandled error in the main loop: ${String(err)}`, 'error', true); }
+        catch (err) {
+            log(ns, `WARNING: gangs.js Caught (and suppressed) an unexpected error in the main loop:\n` +
+                (typeof err === 'string' ? err : err.message || JSON.stringify(err)), false, 'warning');
+        }
         await ns.sleep(updateInterval);
     }
 }
@@ -85,18 +89,26 @@ async function initialize(ns) {
     pctTraining = options['no-training'] ? 0 : options['training-percentage'];
 
     let loggedWaiting = false;
-    while (!(await getNsDataThroughFile(ns, 'ns.gang.inGang()', '/Temp/player-gang-joined.txt'))) {
-        if (!loggedWaiting) {
-            log(ns, `Waiting to be in a gang. Will create the highest faction gang as soon as it is available...`);
-            loggedWaiting = true;
+    while (!(await getNsDataThroughFile(ns, 'ns.gang.inGang()', '/Temp/gang-inGang.txt'))) {
+        try {
+            if (!loggedWaiting) {
+                log(ns, `Waiting to be in a gang. Will create the highest faction gang as soon as it is available...`);
+                loggedWaiting = true;
+            }
+            await runCommand(ns, `${JSON.stringify(gangsByPower)}.forEach(g => ns.gang.createGang(g))`, '/Temp/gang-createGang.js');
         }
-        await runCommand(ns, `${JSON.stringify(gangsByPower)}.forEach(g => ns.gang.createGang(g))`, '/Temp/gang-createGang.js');
+        catch (err) {
+            log(ns, `WARNING: gangs.js Caught (and suppressed) an unexpected error while waiting to join a gang:\n` +
+                (typeof err === 'string' ? err : err.message || JSON.stringify(err)), false, 'warning');
+        }
         await ns.sleep(1000); // Wait for our human to join a gang
     }
+    const playerData = await getNsDataThroughFile(ns, 'ns.getPlayer()', '/Temp/player-info.txt');
     log(ns, "Collecting gang information...");
     const myGangInfo = await getNsDataThroughFile(ns, 'ns.gang.getGangInformation()', '/Temp/gang-info.txt');
     myGangFaction = myGangInfo.faction;
-    if (loggedWaiting) log(ns, `SUCCESS: Created gang ${myGangFaction}`, 'success', true);
+    if (loggedWaiting)
+        log(ns, `SUCCESS: Created gang ${myGangFaction} (At ${formatDuration(playerData.playtimeSinceLastBitnode)} into BitNode)`, 'success', true);
     isHackGang = myGangInfo.isHacking;
     importantStats = isHackGang ? ["hack"] : ["str", "def", "dex", "agi"];
     territoryNextTick = lastTerritoryPower = lastOtherGangInfo = null;
@@ -105,13 +117,13 @@ async function initialize(ns) {
 
     // If possible, determine how much rep we would need to get the most expensive unowned augmentation
     const sf4Level = ownedSourceFiles[4] || 0;
-    requiredRep = -1;
+    requiredRep = 2.5e6;
     if (sf4Level == 0)
         log(ns, `INFO: SF4 required to get gang augmentation info. Defaulting to assuming ~2.5 million rep is desired.`);
     else {
         try {
             if (sf4Level < 3)
-                log(ns, `WARNING: This script makes heavy use of singularity functions, which are quite expensive before you have SF4.3. ` +
+                log(ns, `WARNING: This script makes use of singularity functions, which are quite expensive before you have SF4.3. ` +
                     `Unless you have a lot of free RAM for temporary scripts, you may get runtime errors.`);
             const augmentationNames = await getNsDataThroughFile(ns, `ns.getAugmentationsFromFaction('${myGangFaction}')`, '/Temp/gang-augs.txt');
             const ownedAugmentations = await getNsDataThroughFile(ns, `ns.getOwnedAugmentations(true)`, '/Temp/player-augs-purchased.txt');
@@ -123,15 +135,6 @@ async function initialize(ns) {
             log(ns, `WARNING: Failed to get augmentation info despite having SF4.${sf4Level}. This may be due to you having insufficient RAM to launch the temporary scripts. ` +
                 `Proceeding with the default assumption that ~2.5 million rep is desired.`);
         }
-    }
-    if (requiredRep == -1)
-        requiredRep = 2.5e6
-
-    // Hack: Default aug budget is cut by 1/100 in a few situations (TODO: Add more, like when gang income is severely nerfed)
-    const playerData = await getNsDataThroughFile(ns, 'ns.getPlayer()', '/Temp/player-info.txt');
-    if (!playerData.has4SDataTixApi || playerData.bitNodeN === 8) {
-        defaultMaxSpendPerTickPermanentEquipment /= 100;
-        defaultMaxSpendPerTickTransientEquipment /= 100;;
     }
 
     // Initialize equipment information
@@ -404,10 +407,16 @@ async function tryUpgradeMembers(ns, dictMembers) {
     const maxBudget = 0.99; // Note: To avoid rounding issues and micro-spend race-conditions, only allow budgeting up to 99% of money per tick
     let budget = Math.min(maxBudget, (options['equipment-budget'] || defaultMaxSpendPerTickTransientEquipment)) * homeMoney;
     let augBudget = Math.min(maxBudget, (options['augmentations-budget'] || defaultMaxSpendPerTickPermanentEquipment)) * homeMoney;
-    if (budget <= 0) return;
+    // Hack: Default aug budget is cut by 1/100 in a few situations (TODO: Add more, like when BitnodeMults are such that gang income is severely nerfed)
+    if (!playerData.has4SDataTixApi || playerData.bitNodeN === 8) {
+        budget /= 100;
+        augBudget /= 100;
+    }
     // Find out what outstanding equipment can be bought within our budget
     for (const equip of equipments) {
+        if (augBudget <= 0) break;
         for (const member of Object.values(dictMembers)) { // Get this equip for each member before considering the next most expensive equip
+            if (augBudget <= 0) break;
             // Bit of a hack: Inflate the "cost" of equipment that doesn't contribute to our main stats so that we don't purchase them unless we have ample cash
             let percievedCost = equip.cost * (Object.keys(equip.stats).some(stat => importantStats.some(i => stat.includes(i))) ? 1 : offStatCostPenalty);
             if (percievedCost > augBudget) continue;

@@ -1,4 +1,4 @@
-import { formatNumberShort, formatMoney, getNsDataThroughFile, getActiveSourceFiles, disableLogs } from './helpers.js'
+import { log, formatNumberShort, formatMoney, instanceCount, getNsDataThroughFile, getActiveSourceFiles, disableLogs } from './helpers.js'
 
 const argsSchema = [
     ['hide-stocks', false],
@@ -12,6 +12,7 @@ export function autocomplete(data, args) {
 
 /** @param {NS} ns **/
 export async function main(ns) {
+    if (await instanceCount(ns) > 1) return; // Prevent multiple instances of this script from being started, even with different args.
     const options = ns.flags(argsSchema);
     const doc = eval('document');
     const hook0 = doc.getElementById('overview-extra-hook-0');
@@ -21,7 +22,7 @@ export async function main(ns) {
     let inBladeburner = playerInfo.inBladeburner;
     const bitNode = playerInfo.bitNodeN;
     let stkSymbols = null;
-    if (!options['hide-stocks'] && playerInfo.hasTixApiAccess) // Auto-disabled if we do not have the TSK API
+    if (!options['hide-stocks'] && playerInfo.hasTixApiAccess) // Auto-disabled if we do not have the TIX API
         stkSymbols = await getNsDataThroughFile(ns, `ns.stock.getSymbols()`, '/Temp/stock-symbols.txt');
     disableLogs(ns, ['sleep']);
 
@@ -58,7 +59,7 @@ export async function main(ns) {
             addHud("ScrInc", formatMoney(ns.getScriptIncome()[0], 3, 2) + '/sec', "Total 'instantenous' income per second being earned across all scripts running on all servers.");
             addHud("ScrExp", formatNumberShort(ns.getScriptExpGain(), 3, 2) + '/sec', "Total 'instantenous' hack experience per second being earned across all scripts running on all servers.");
 
-            const reserve = (await ns.read("reserve.txt")) || 0;
+            const reserve = ns.read("reserve.txt") || 0;
             if (reserve > 0) // Bitburner bug: Trace amounts of share power sometimes left over after we stop sharing
                 addHud("Reserve", formatNumberShort(reserve, 3, 2), "Most scripts will leave this much money unspent. Remove with `run reserve.js 0`");
 
@@ -113,7 +114,8 @@ export async function main(ns) {
             hudData.length = 0; // Clear the hud data for the next iteration
 
         } catch (err) { // Might run out of ram from time to time, since we use it dynamically
-            ns.print("ERROR: Update Skipped: " + String(err));
+            log(ns, `WARNING: stats.js Caught (and suppressed) an unexpected error in the main loop. Update Skipped:\n` +
+                (typeof err === 'string' ? err : err.message || JSON.stringify(err)), false, 'warning');
         }
         await ns.sleep(1000);
     }

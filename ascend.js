@@ -1,9 +1,10 @@
 import { getFilePath, runCommand, waitForProcessToComplete, getNsDataThroughFile, getActiveSourceFiles, log } from './helpers.js'
 
-const defaultScriptsToKill = ['daemon.js', 'gangs.js', 'sleeves.js', 'work-for-factions.js', 'farm-intelligence.js', 'hacknet-upgrade-manager.js']
+const defaultScriptsToKill = ['daemon.js', 'gangs.js', 'sleeve.js', 'work-for-factions.js', 'farm-intelligence.js', 'hacknet-upgrade-manager.js']
     .map(s => getFilePath(s));
 
 const argsSchema = [
+    ['prioritize-augmentations', false], // If set to true, will spend as much money as possible on augmentations before upgrading home RAM
     ['install-augmentations', false], // By default, augs will only be purchased. Set this flag to install (a.k.a reset)
     /* OR */['reset', false], // An alias for the above flag, does the same thing.
     ['allow-soft-reset', false], // If set to true, allows ascend.js to invoke a **soft** reset (installs no augs) when no augs are affordable. This is useful e.g. when ascending rapidly to grind hacknet hash upgrades.
@@ -48,24 +49,28 @@ export async function main(ns) {
     // STEP 1: Liquidate Stocks and (SF9) Hacknet Hashes
     log(ns, 'Sell stocks and hashes...', true, 'info');
     ns.run(getFilePath('spend-hacknet-hashes.js'), 1, '--liquidate');
-    let stockValue = null;
     if (playerData.hasTixApiAccess) {
-        ns.run(getFilePath('stockmaster.js'), 1, '--liquidate');
         const stkSymbols = await getNsDataThroughFile(ns, `ns.stock.getSymbols()`, '/Temp/stock-symbols.txt');
-        while (stockValue !== 0) { // It takes a bit of time for things to get sold. Wait until we see no stock holdings
-            stockValue = await getNsDataThroughFile(ns, JSON.stringify(stkSymbols) +
-                `.map(sym => ({ sym, pos: ns.stock.getPosition(sym), ask: ns.stock.getAskPrice(sym), bid: ns.stock.getBidPrice(sym) }))` +
-                `.reduce((total, stk) => total + stk.pos[0] * stk.bid + stk.pos[2] * (stk.pos[3] * 2 - stk.ask) -100000 * (stk.pos[0] + stk.pos[2] > 0 ? 1 : 0), 0)`,
-                '/Temp/stock-portfolio-value.txt');
-            log(ns, 'INFO: Waiting for stocks to be sold...', false, 'info');
-            await ns.sleep(200);
+        const countOwnedStocks = async () => await getNsDataThroughFile(ns, `ns.args.map(sym => ns.stock.getPosition(sym))` +
+            `.reduce((t, stk) => t + (stk[0] + stk[2] > 0 ? 1 : 0), 0)`, '/Temp/owned-stocks.txt', stkSymbols);
+        let ownedStocks = await countOwnedStocks();
+        while (ownedStocks > 0) {
+            log(ns, `INFO: Waiting for ${ownedStocks} owned stocks to be sold...`, false, 'info');
+            pid = ns.run(getFilePath('stockmaster.js'), 1, '--liquidate');
+            if (pid) await waitForProcessToComplete(ns, pid, true);
+            else log(ns, `ERROR: Failed to run "stockmaster.js --liquidate" to sell ${ownedStocks} owned stocks. Will try again soon...`, false, 'true');
+            await ns.sleep(1000);
+            ownedStocks = await countOwnedStocks();
         }
     }
 
     // STEP 2: Buy Home RAM Upgrades (more important than squeezing in a few extra augs)
-    log(ns, 'Try Upgrade Home RAM...', true, 'info');
-    pid = ns.run(getFilePath('Tasks/ram-manager.js'), 1, '--reserve', '0', '--budget', '0.8');
-    await waitForProcessToComplete(ns, pid, true); // Wait for the script to shut down, indicating it has bought all it can.
+    const spendOnHomeRam = async () => {
+        log(ns, 'Try Upgrade Home RAM...', true, 'info');
+        pid = ns.run(getFilePath('Tasks/ram-manager.js'), 1, '--reserve', '0', '--budget', '0.8');
+        await waitForProcessToComplete(ns, pid, true); // Wait for the script to shut down, indicating it has bought all it can.
+    };
+    if (!options['prioritize-augmentations']) await spendOnHomeRam();
 
     // TODO: (SF13) If Stanek is unlocked, and we have not yet accepted Stanek's gift, now's our last chance to do it (before purchasing augs)
 
@@ -87,6 +92,9 @@ export async function main(ns) {
     if (noAugsToInstall && !options['allow-soft-reset'])
         return log(ns, `ERROR: See above faction-manager.js logs - there are no new purchased augs. ` +
             `Specify --allow-soft-reset to proceed without any purchased augs.`, true, 'error');
+
+    // STEP 2 (Deferred): Upgrade home RAM after purchasing augmentations if this option was set.
+    if (options['prioritize-augmentations']) await spendOnHomeRam();
 
     // STEP 4: Try to Buy 4S data / API if we haven't already and can afford it (although generally stockmaster.js would have bought these if it could)
     log(ns, 'Checking on Stock Market upgrades...', true, 'info');
@@ -113,6 +121,13 @@ export async function main(ns) {
     log(ns, 'Try Upgrade Home Cores...', true, 'info');
     pid = await runCommand(ns, `while(ns.upgradeHomeCores()); { await ns.sleep(10); }`, '/Temp/upgrade-home-ram.js');
     await waitForProcessToComplete(ns, pid, true); // Wait for the script to shut down, indicating it has bought all it can.
+
+    // STEP 8: Join every faction we've been invited to (gives a little INT XP)
+    let invites = await getNsDataThroughFile(ns, 'ns.checkFactionInvitations()', '/Temp/faction-invitations.txt');
+    if (invites.length > 0) {
+        pid = await runCommand(ns, 'ns.args.forEach(f => ns.joinFaction(f))', '/Temp/join-factions.js', invites);
+        await waitForProcessToComplete(ns, pid, true);
+    }
 
     // TODO: If in corporation, and buyback shares is available, buy as many as we can afford
     // TODO: Anything to do for Bladeburner?

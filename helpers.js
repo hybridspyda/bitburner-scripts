@@ -54,6 +54,7 @@ export function formatDateTime(datetime) { return datetime.toISOString(); }
 /** Format a duration (in milliseconds) as e.g. '1h 21m 6s' for big durations or e.g '12.5s' / '23ms' for small durations */
 export function formatDuration(duration) {
   if (duration < 1000) return `${duration.toFixed(0)}ms`
+  if (!isFinite(duration)) return 'forever (Infinity)'
   const portions = [];
   const msInHour = 1000 * 60 * 60;
   const hours = Math.trunc(duration / msInHour);
@@ -166,13 +167,18 @@ export async function getNsDataThroughFile_Custom(ns, fnRun, fnIsAlive, command,
   if (verbose) ns.print(`Process ${pid} is done. Reading the contents of ${fName}...`);
   // Read the file, with auto-retries if it fails
   let lastRead;
-  const fileData = await autoRetry(ns, () => ns.read(fName), f => (lastRead = f) !== undefined && f !== "" && f !== "STALE",
-      () => `ns.read('${fName}') returned no result ("${lastRead}") (command likely failed to run).` +
-          `\n  Command: ${command}\n  Script: ${fNameCommand}` +
-          `\nEnsure you have sufficient free RAM to run this temporary script.`,
-      maxRetries, retryDelayMs, undefined, verbose);
-  if (verbose) ns.print(`Read the following data for command ${command}:\n${fileData}`);
-  return JSON.parse(fileData); // Deserialize it back into an object/array and return
+  try {
+      const fileData = await autoRetry(ns, () => ns.read(fName), f => (lastRead = f) !== undefined && f !== "" && f !== "STALE",
+          () => `ns.read('${fName}') returned no result ("${lastRead}") (command likely failed to run).` +
+              `\n  Command: ${command}\n  Script: ${fNameCommand}` +
+              `\nEnsure you have sufficient free RAM to run this temporary script.`,
+          maxRetries, retryDelayMs, undefined, verbose);
+      if (verbose) ns.print(`Read the following data for command ${command}:\n${fileData}`);
+      return JSON.parse(fileData); // Deserialize it back into an object/array and return
+  } finally {
+      // If we failed to run the command, clear the "stale" contents we created earlier. Ideally, we would remove the file entirely, but this is not free.
+      if (lastRead == "STALE") await ns.write(fName, "", 'w');
+  }
 }
 
 /** Evaluate an arbitrary ns command by writing it to a new script and then running or executing it.
@@ -241,9 +247,10 @@ export async function waitForProcessToComplete_Custom(ns, fnIsAlive, pid, verbos
   checkNsInstance(ns, '"waitForProcessToComplete_Custom"');
   if (!verbose) disableLogs(ns, ['asleep']);
   // Wait for the PID to stop running (cheaper than e.g. deleting (rm) a possibly pre-existing file and waiting for it to be recreated)
+  let start = Date.now();
   for (var retries = 0; retries < 1000; retries++) {
       if (!fnIsAlive(pid)) break; // Script is done running
-      if (verbose && retries % 100 === 0) ns.print(`Waiting for pid ${pid} to complete... (${retries})`);
+      if (verbose && retries % 100 === 0) ns.print(`Waiting for pid ${pid} to complete... (${formatDuration(Date.now() - start)})`);
       await ns.asleep(10);
   }
   // Make sure that the process has shut down and we haven't just stopped retrying
@@ -279,11 +286,15 @@ export async function autoRetry(ns, fnFunctionThatMayFail, fnSuccessCondition, e
 
 /** Helper to log a message, and optionally also tprint it and toast it
 * @param {NS} ns - The nestcript instance passed to your script's main entry point */
-export function log(ns, message = "", alsoPrintToTerminal = false, toastStyle = "", maxToastLength = 100) {
+export function log(ns, message = "", alsoPrintToTerminal = false, toastStyle = "", maxToastLength = Number.MAX_SAFE_INTEGER) {
   checkNsInstance(ns, '"log"');
   ns.print(message);
-  if (alsoPrintToTerminal) ns.tprint(message);
   if (toastStyle) ns.toast(message.length <= maxToastLength ? message : message.substring(0, maxToastLength - 3) + "...", toastStyle);
+  if (alsoPrintToTerminal) {
+      ns.tprint(message);
+      // TODO: Find a way write things logged to the terminal to a "permanent" terminal log file, preferably without this becoming an async function.
+      //ns.write("log.terminal.txt", message + '\n', 'a'); // Note: we should get away with not awaiting this promise since it's not a script file
+  }
   return message;
 }
 
@@ -305,7 +316,7 @@ export function scanAllServers(ns) {
 }
 
 /** @param {NS} ns 
-* Get a dictionary of active source files, taking into account the current active bitnode as well. **/
+* Get a dictionary of active source files, taking into account the current active bitnode as well (optionally disabled). **/
 export async function getActiveSourceFiles(ns, includeLevelsFromCurrentBitnode = true) {
   return await getActiveSourceFiles_Custom(ns, getNsDataThroughFile, includeLevelsFromCurrentBitnode);
 }
@@ -314,18 +325,17 @@ export async function getActiveSourceFiles(ns, includeLevelsFromCurrentBitnode =
 * getActiveSourceFiles Helper that allows the user to pass in their chosen implementation of getNsDataThroughFile to minimize RAM usage **/
 export async function getActiveSourceFiles_Custom(ns, fnGetNsDataThroughFile, includeLevelsFromCurrentBitnode = true) {
   checkNsInstance(ns, '"getActiveSourceFiles"');
-  let tempFile = '/Temp/owned-source-files.txt';
   // Find out what source files the user has unlocked
   let dictSourceFiles;
-  try { await fnGetNsDataThroughFile(ns, `Object.fromEntries(ns.getOwnedSourceFiles().map(sf => [sf.n, sf.lvl]))`, tempFile); } catch { }
-  if (!dictSourceFiles) { // Bit of a hack, but if RAM is so low that this fails, we can fallback to using an older version of this file, and even assuming we have no source files.
-      dictSourceFiles = ns.read(tempFile)
-      dictSourceFiles = dictSourceFiles ? JSON.parse(dictSourceFiles) : {};
-  }
+  try {
+      dictSourceFiles = await fnGetNsDataThroughFile(ns, `Object.fromEntries(ns.getOwnedSourceFiles().map(sf => [sf.n, sf.lvl]))`, '/Temp/owned-source-files.txt');
+  } catch { dictSourceFiles = {}; } // If this fails (e.g. low RAM), return an empty dictionary
   // If the user is currently in a given bitnode, they will have its features unlocked
   if (includeLevelsFromCurrentBitnode) {
-      const bitNodeN = (await fnGetNsDataThroughFile(ns, 'ns.getPlayer()', '/Temp/player-info.txt')).bitNodeN;
-      dictSourceFiles[bitNodeN] = Math.max(3, dictSourceFiles[bitNodeN] || 0);
+      try {
+          const bitNodeN = (await fnGetNsDataThroughFile(ns, 'ns.getPlayer()', '/Temp/player-info.txt')).bitNodeN;
+          dictSourceFiles[bitNodeN] = Math.max(3, dictSourceFiles[bitNodeN] || 0);
+      } catch { /* We are expected to be fault-tolerant in low-ram conditions */ }
   }
   return dictSourceFiles;
 }
@@ -345,6 +355,23 @@ export async function tryGetBitNodeMultipliers_Custom(ns, fnGetNsDataThroughFile
   if (!canGetBitNodeMultipliers) return null;
   try { return await fnGetNsDataThroughFile(ns, 'ns.getBitNodeMultipliers()', '/Temp/bitnode-multipliers.txt'); } catch { }
   return null;
+}
+
+/** @param {NS} ns 
+* Returns the number of instances of the current script running on the specified host. **/
+export async function instanceCount(ns, onHost = "home", warn = true, tailOtherInstances = true) {
+  checkNsInstance(ns, '"alreadyRunning"');
+  const scriptName = ns.getScriptName();
+  const others = await getNsDataThroughFile(ns, 'ns.ps(ns.args[0]).filter(p => p.filename == ns.args[1]).map(p => p.pid)',
+      '/Temp/ps-other-instances.txt', [onHost, scriptName]);
+  if (others.length >= 2) {
+      if (warn)
+          log(ns, `WARNING: You cannot start multiple versions of this script (${scriptName}). Please shut down the other instance first.` +
+              (tailOtherInstances ? ' (To help with this, a tail window for the other instance will be opened)' : ''), true, 'warning');
+      if (tailOtherInstances) // Tail all but the last pid, since it will belong to the current instance (which will be shut down)
+          others.slice(0, others.length - 1).forEach(pid => ns.tail(pid));
+  }
+  return others.length;
 }
 
 /** @param {NS} ns 
