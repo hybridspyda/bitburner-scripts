@@ -97,7 +97,7 @@ async function startUp(ns) {
 	unlockedSFs = await getActiveSourceFiles(ns, true);
 	try {
 		installedAugmentations = !(4 in unlockedSFs) ? [] :
-			await getNsDataThroughFile(ns, 'ns.getOwnedAugmentations()', '/Temp/player-augs-installed.txt');
+			await getNsDataThroughFile(ns, 'ns.singularity.getOwnedAugmentations()', '/Temp/player-augs-installed.txt');
 		if (!(4 in unlockedSFs))
 			log(ns, `WARNING: This script requires SF4 (singularity) functions to assess purchasable augmentations ascend automatically. ` +
 				`Some functionality will be diabled and you'll have to manage working for factions, purchasing, and installing augmentations yourself.`, true);
@@ -176,7 +176,7 @@ async function checkOnDaedalusStatus(ns, player, stocksValue) {
 		return reserveForDaedalus = false;
 	}
 	if (reserveForDaedalus) { // Already waiting for a Daedalus invite, try joining them
-		return (4 in unlockedSFs) ? await getNsDataThroughFile(ns, 'ns.joinFaction(ns.args[0])', '/Temp/joinFaction.txt', ["Daedalus"]) :
+		return (4 in unlockedSFs) ? await getNsDataThroughFile(ns, 'ns.singularity.joinFaction(ns.args[0])', '/Temp/joinFaction.txt', ["Daedalus"]) :
 			log(ns, "INFO: Please manually join the faction 'Daedalus' as soon as possible to proceed", false, 'info');
 	}
 	const bitNodeMults = await tryGetBitNodeMultipliers(ns, false) || { DaedalusAugsRequirement: 1 };
@@ -316,7 +316,7 @@ async function checkOnRunningScripts(ns, player) {
 
 	// Spend hacknet hashes on our boosting best hack-income server once established
 	const spendingHashesOnHacking = findScript('spend-hacknet-hashes.js', s => s.args.includes("--spend-on-server"))
-	if ((9 in unlockedSFs) && !spendingHashesOnHacking && player.playtimeSinceLastAug >= options['time-before-boosting-best-hack-server']) {
+	if ((9 in unlockedSFs) && !spendingHashesOnHacking && player.playtimeSinceLastAug >= options['time-before-boosting-best-hack-server'] && !(player.bitNodeN == 8)) {
 		const strServerIncomeInfo = ns.read('/Temp/analyze-hack.txt');	// HACK: Steal this file that Daemon also relies on
 		if (strServerIncomeInfo) {
 			const incomeByServer = JSON.parse(strServerIncomeInfo);
@@ -418,9 +418,14 @@ async function maybeDoCasino(ns, player) {
 		await ns.sleep(200); // Wait a short while for the dust to settle.
 	} else if (casinoRanFileSet)
 		return ranCasino = true;
-	if (player.playtimeSinceLastAug < 60000) // If it's been less than 1 minute, wait a while to establish income
+	//If it's been less than 1 minute, wait a while to establish income
+	//Unless we have CashRoot Starter Kit, at which point we should head straight to the casino
+	//Or if BN8, as that also gives us plenty of starter cash to casino immediately
+	if (player.playtimeSinceLastAug < 60000 && !installedAugmentations.includes(`CashRoot Starter Kit`) && !player.bitNodeN == 8)
 		return;
-	if (player.money / player.playtimeSinceLastAug > 5e9 / 60000) // If we're making more than ~5b / minute, no need to run casino.
+	// If we're making more than ~5b / minute, no need to run casino.
+	//Unless BN8, if BN8 we always need casino cash bootstrap
+	if (player.money / player.playtimeSinceLastAug > 5e9 / 60000 && !player.bitNodeN == 8) 
 		return ranCasino = true;
 	if (player.money > 10E9) // If we already have 10b, assume we ran and lost track, or just don't need the money
 		return ranCasino = true;
@@ -432,7 +437,7 @@ async function maybeDoCasino(ns, player) {
 	await killScript(ns, 'work-for-factions.js');
 	// Kill any action, in case we are studying or working out, as it might steal focus or funds before we can bet it at the casino.
 	if (4 in unlockedSFs) // No big deal if we can't, casino.js has logic to find the stop button and click it.
-		await getNsDataThroughFile(ns, `ns.stopAction()`, '/Temp/stop-action.txt');
+		await getNsDataThroughFile(ns, `ns.singularity.stopAction()`, '/Temp/stop-action.txt');
 
 	const pid = launchScriptHelper(ns, 'casino.js', ['--kill-all-scripts', true, '--on-completion-script', ns.getScriptName()]);
 	if (pid) {
@@ -567,7 +572,7 @@ async function shouldDelayInstall(ns, player, facmanOutput) {
 	// enough rep, or enough money to donate for rep to buy TRP (Reminder: donations always unlocked in BN8)
 	if (player.bitNodeN == 8 && player.factions.includes("Daedalus") && (wdHack || 0) == 0) {
 		// Sanity check, ensure the player hasn't manually purchased (but not yet installed) TRP
-		const ownedAugmentations = await getNsDataThroughFile(ns, `ns.getOwnedAugmentations(true)`, '/Temp/player-augs-purchased.txt');
+		const ownedAugmentations = await getNsDataThroughFile(ns, `ns.singularity.getOwnedAugmentations(true)`, '/Temp/player-augs-purchased.txt');
 		if (!facmanOutput.affordable_augs.includes("The Red Pill") && !ownedAugmentations.includes("The Red Pill")) {
 			setStatus(ns, `Not installing until we have enough Daedalus rep to install TRP on our next reset.`)
 			return true;

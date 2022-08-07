@@ -14,7 +14,7 @@
     do {
         let foundMissingProgram = false;
         for (const prog of programNames) {
-            if (!ns.fileExists(prog, "home") && ns.purchaseProgram(prog))
+            if (!ns.fileExists(prog, "home") && ns.singularity.purchaseProgram(prog))
                 ns.toast(`Purchased ${prog}`, 'success');
             else if (keepRunning)
                 foundMissingProgram = true;
