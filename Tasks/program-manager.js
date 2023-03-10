@@ -3,7 +3,7 @@
  * from the darkweb we can afford so we don't have to do it manually
  * or write them ourselves. Like tor-manager, this script dies a natural death
  * once all programs are bought. **/
- export async function main(ns) {
+export async function main(ns) {
     const programNames = ["BruteSSH.exe", "FTPCrack.exe", "relaySMTP.exe", "HTTPWorm.exe", "SQLInject.exe"];
     const interval = 2000;
 

@@ -2,7 +2,7 @@
  * the purpose of tor-manager is to buy the TOR router ASAP
  * so that another script can buy the port breakers. This script
  * dies a natural death once tor is bought. **/
- export async function main(ns) {
+export async function main(ns) {
     const interval = 2000;
 
     var keepRunning = ns.args.length > 0 && ns.args[0] == "-c";

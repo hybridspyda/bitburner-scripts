@@ -1,6 +1,6 @@
 /** @param {NS} ns 
  * Wait until an appointed time and then execute a manual hack. */
- export async function main(ns) {
+export async function main(ns) {
     //args[0: target, 1: desired start time, 2: expected end, 3: expected duration, 4: description, 5: manipulate stock (N/A ignored), 6: disable toast warnings, 7: loop]
     const sleepDuration = ns.args.length > 1 ? ns.args[1] - Date.now() : 0;
     const expectedDuration = ns.args.length > 3 ? ns.args[3] : 0;

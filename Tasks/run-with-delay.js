@@ -3,7 +3,7 @@
  * Similar to ns.spawn, but can be run for cheaper (1GB for ns.run vs 2GB for ns.spawn), the delay can be shorter,
  * and you have the option to *not* shut down the current script, but instead continue execution.
  **/
- export async function main(ns) {
+export async function main(ns) {
     var scriptpath = ns.args[0]; // Name of script to run is arg 0
     var delay = ns.args[1]; // Delay time is arg 1
     // Any additional args are forwarded to the script being run

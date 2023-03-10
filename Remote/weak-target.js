@@ -1,6 +1,6 @@
 /** @param {NS} ns 
  * Wait until an appointed time and then execute a weaken. */
- export async function main(ns) {
+export async function main(ns) {
     //args[0: target, 1: desired start time, 2: expected end, 3: expected duration, 4: description, 5: disable toast warnings, 6: loop]
     let sleepDuration = ns.args[1] - Date.now();
     const disableToastWarnings = ns.args.length > 5 ? ns.args[5] : false;
