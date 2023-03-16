@@ -41,7 +41,7 @@ export async function main(ns) {
 					icon = "🌱";
 				} else if (saturation == 100 && securityRating < 1) {
 					variant = "INFO";
-					icon = "💵";
+					icon = "🤑";
 				}
 				
 				ns.print(
