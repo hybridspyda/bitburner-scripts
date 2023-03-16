@@ -27,6 +27,7 @@ export async function main(ns) {
 				server.sudo();
 				if (server.admin) {
 					unlocked = true;
+					ns.toast(`🔑🔓 ${server.id} now unlocked.`);
 				}
 			}
 			
