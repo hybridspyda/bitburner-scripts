@@ -20,6 +20,7 @@ export async function main(ns) {
 			if (server.purchased || server.isHome) {
 				continue;
 			}
+
 			let unlocked = false;
 			let serverInfoGiven = false;
 			// Gain admin on all servers that we can
@@ -30,11 +31,17 @@ export async function main(ns) {
 					ns.toast(`🔑🔓 ${server.id} now unlocked.`);
 				}
 			}
+
+			//ns.print(player.hacking);
+			let shouldBackdoor = !server.backdoored && server.level <= player.data.skills.hacking;
+			if (shouldBackdoor && server.admin) {
+				ns.toast(`🚪 Backdoor able to be installed on ${server.id} (${server.level})!`, "info");
+			}
 			
 			if (server.money.max != 0) {
 				let securityRating = (server.security.level - server.security.min).toFixed(2);
 				let saturation = (server.money.available / server.money.max * 100).toFixed(2);
-				let moneymax = ns.nFormat(server.money.max, "$0.000a");
+				let moneymax = ns.formatNumber(server.money.max);
 				let variant = "ERROR";
 				let icon = "☠️";
 				if (saturation != 100.00 && securityRating < 2) {
@@ -45,11 +52,12 @@ export async function main(ns) {
 					icon = "🤑";
 				}
 				
+				let msg = `(${securityRating}) [${saturation}% of ${moneymax}]`;
 				ns.print(
 					`${variant}\t${
 						!server.admin ? " 🔒" : unlocked ? " 🔑" : "   "
 					}${	!server.backdoored ? "🚪" : "  "
-					}(${securityRating}) [${saturation}% of ${moneymax}] \t${icon} @ ${server.id}`
+					}${msg}${msg.length > 26 ? " " : "\t"}${icon} @ ${server.id}`
 				);
 				serverInfoGiven = true;
 			}
