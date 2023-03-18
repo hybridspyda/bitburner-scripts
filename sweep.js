@@ -1,6 +1,8 @@
 import HackableBaseServer from "/if/server.hackable.js"
 import BasePlayer from "/if/player.js";
+import { scriptContractor } from "/var/constants.js";
 import { dpList } from "/lib/utils.js";
+import { getFilePath } from "/helpers.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -32,12 +34,17 @@ export async function main(ns) {
 				}
 			}
 
-			//ns.print(player.hacking);
-			let shouldBackdoor = !server.backdoored && server.level <= player.data.skills.hacking;
+			let contracts = ns.ls(server.id, ".cct"); // Find out whether there are any contracts on the server
+			if (contracts[0]) {
+				ns.toast(`📜 Contract found on ${server.id}...`, "info");
+				ns.run(getFilePath('/Tasks/run-with-delay.js'), 1, scriptContractor);
+			}
+
+			let shouldBackdoor = !server.backdoored && server.level <= player.hacking.level;
 			if (shouldBackdoor && server.admin) {
 				ns.toast(`🚪 Backdoor able to be installed on ${server.id} (${server.level})!`, "info");
 			}
-			
+
 			if (server.money.max != 0) {
 				let securityRating = (server.security.level - server.security.min).toFixed(2);
 				let saturation = (server.money.available / server.money.max * 100).toFixed(2);
@@ -51,13 +58,13 @@ export async function main(ns) {
 					variant = "INFO";
 					icon = "🤑";
 				}
-				
+
 				let msg = `(${securityRating}) [${saturation}% of ${moneymax}]`;
 				ns.print(
-					`${variant}\t${
-						!server.admin ? " 🔒" : unlocked ? " 🔑" : "   "
-					}${	!server.backdoored ? "🚪" : "  "
-					}${msg}${msg.length > 26 ? " " : "\t"}${icon} @ ${server.id}`
+					`${variant}\t${contracts[0] ? "📜" : "  "
+					}${!server.admin ? " 🔒" : unlocked ? " 🔑" : "   "
+					}${!server.backdoored ? "🚪" : "  "
+					}${msg}${msg.length <= 25 ? "\t " : " "}${icon} @ ${server.id}`
 				);
 				serverInfoGiven = true;
 			}
