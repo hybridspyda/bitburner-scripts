@@ -1,8 +1,7 @@
 import HackableBaseServer from "/if/server.hackable.js"
 import BasePlayer from "/if/player.js";
-import { scriptContractor } from "/var/constants.js";
+import { scriptRunWithDelay, scriptContractor } from "/var/constants.js";
 import { dpList } from "/lib/utils.js";
-import { getFilePath } from "/helpers.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -37,7 +36,7 @@ export async function main(ns) {
 			let contracts = ns.ls(server.id, ".cct"); // Find out whether there are any contracts on the server
 			if (contracts[0]) {
 				ns.toast(`📜 Contract found on ${server.id}...`, "info");
-				ns.run(getFilePath('/Tasks/run-with-delay.js'), 1, scriptContractor);
+				ns.run(scriptRunWithDelay, 1, scriptContractor, 5000);
 			}
 
 			let shouldBackdoor = !server.backdoored && server.level <= player.hacking.level;
@@ -64,7 +63,7 @@ export async function main(ns) {
 					`${variant}\t${contracts[0] ? "📜" : "  "
 					}${!server.admin ? " 🔒" : unlocked ? " 🔑" : "   "
 					}${!server.backdoored ? "🚪" : "  "
-					}${msg}${msg.length <= 25 ? "\t " : " "}${icon} @ ${server.id}`
+					}${msg}${msg.length <= 28 ? "\t " : " "}${icon} @ ${server.id}`
 				);
 				serverInfoGiven = true;
 			}
