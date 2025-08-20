@@ -1,3 +1,5 @@
+import { formatMoney } from './helpers.js'
+
 export async function main(ns) {
 	const flags = ns.flags([
 		['refreshrate', 200],
@@ -10,7 +12,7 @@ export async function main(ns) {
 		ns.tprint(`> run ${ns.getScriptName()} n00dles`)
 		return;
 	}
-	ns.tail();
+	ns.ui.openTail();
 	ns.disableLog('ALL');
 	while (true) {
 		const server = flags._[0];
@@ -21,7 +23,7 @@ export async function main(ns) {
 		const sec = ns.getServerSecurityLevel(server);
 		ns.clearLog(server);
 		ns.print(`${server}:`);
-		ns.print(` $_______: ${ns.nFormat(money, "$0.000a")} / ${ns.nFormat(maxMoney, "$0.000a")} (${(money / maxMoney * 100).toFixed(2)}%)`);
+		ns.print(` $_______: $${formatMoney(money)} / $${formatMoney(maxMoney)} (${ns.formatPercent(money / maxMoney)}%)`);
 		ns.print(` security: +${(sec - minSec).toFixed(2)}`);
 		ns.print(` hack____: ${ns.tFormat(ns.getHackTime(server))} (t=${Math.ceil(ns.hackAnalyzeThreads(server, money))})`);
 		ns.print(` grow____: ${ns.tFormat(ns.getGrowTime(server))} (t=${Math.ceil(ns.growthAnalyze(server, maxMoney / money))})`);
