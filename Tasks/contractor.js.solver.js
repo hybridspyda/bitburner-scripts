@@ -1,4 +1,4 @@
-import { jsonReviver, tail } from './helpers.js'
+import { jsonReviver, tail } from '../helpers.js'
 const fUnsolvedContracts = '/Temp/unsolved-contracts.txt'; // A global, persistent array of contracts we couldn't solve, so we don't repeatedly log about them.
 
 let heartbeat = null;

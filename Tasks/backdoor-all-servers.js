@@ -1,4 +1,4 @@
-import { getNsDataThroughFile, getFilePath, getConfiguration, instanceCount, log, getErrorInfo } from './helpers.js'
+import { getNsDataThroughFile, getFilePath, getConfiguration, instanceCount, log, getErrorInfo } from '../helpers.js'
 
 const argsSchema = [
 	['spawn-delay', 50], // Delay to allow time for `installBackdoor` to start running before a we connect back to 'home' and optionally start backdooring the next server
