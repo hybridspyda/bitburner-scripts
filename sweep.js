@@ -48,7 +48,7 @@ export async function main(ns) {
 			if (server.money.max != 0) {
 				let securityRating = (server.security.level - server.security.min).toFixed(2);
 				let saturation = ns.formatPercent(server.money.available / server.money.max);
-				let moneymax = formatMoney(server.moneyMax ?? 0, 4, 1);
+				let moneymax = formatMoney(server.money.max ?? 0, 4, 1);
 				let variant = "ERROR";
 				let icon = "☠️";
 				if (saturation != 100.00 && securityRating < 2) {
