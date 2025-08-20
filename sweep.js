@@ -48,7 +48,7 @@ export async function main(ns) {
 			if (server.money.max != 0) {
 				let securityRating = (server.security.level - server.security.min).toFixed(2);
 				let saturation = ns.formatPercent(server.money.available / server.money.max);
-				let moneymax = formatMoney(server.money.max ?? 0, 4, 1);
+				let moneymax = formatMoney(server.money.max);
 				let variant = "ERROR";
 				let icon = "☠️";
 				if (saturation != 100.00 && securityRating < 2) {
@@ -59,7 +59,8 @@ export async function main(ns) {
 					icon = "🤑";
 				}
 
-				let msg = `(${securityRating}) [${saturation} of ${moneymax}]`;
+				let msg = `(${securityRating}) `+((server.moneyMax ?? 0 > 0 ? `${formatMoney(server.moneyAvailable ?? 0, 4, 1).padStart(7)} / ` : '') +
+					`${formatMoney(server.moneyMax ?? 0, 4, 1).padStart(7)} `).padEnd(18)+` [${saturation} of ${moneymax}]`;
 				ns.print(
 					`${variant}\t${contracts[0] ? "📜" : "  "
 					}${!server.admin ? " 🔒" : unlocked ? " 🔑" : "   "
