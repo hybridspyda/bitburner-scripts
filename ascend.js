@@ -12,7 +12,7 @@ const argsSchema = [
 	// Spawn this script after installing augmentations (Note: Args not supported by the game)
 	['on-reset-script', null], // By default, will start with `stanek.js` if you have stanek's gift, otherwise `daemon.js`.
 	['ticks-to-wait-for-additional-purchases', 10], // Don't reset until we've gone this many game ticks without any new purchases being made (10 * 200ms (game tick time) ~= 2 seconds)
-	['max-wait-time', 60000], // The maximum number of milliseconds we'll wait for external scripts to purchase whatever permanent upgrades they can before we ascend anyway.    
+	['max-wait-time', 60000], // The maximum number of milliseconds we'll wait for external scripts to purchase whatever permanent upgrades they can before we ascend anyway.
 	['prioritize-home-ram', false], // If set to true, will spend as much money as possible on upgrading home RAM before buying augmentations
 	/* Deprecated */['prioritize-augmentations', true], // (Legacy flag, now ignored - left for backwards compatibility)
 ];
@@ -25,7 +25,7 @@ export function autocomplete(data, args) {
 	return [];
 }
 
-/** @param {NS} ns 
+/** @param {NS} ns
  * This script is meant to do all the things best done when ascending (in a generally ideal order) **/
 export async function main(ns) {
 	const options = getConfiguration(ns, argsSchema);
@@ -37,15 +37,13 @@ export async function main(ns) {
 	if (options['prioritize-augmentations'])
 		log(ns, "INFO: The --prioritize-augmentations flag is deprecated, as this is now the default behaviour. Use --prioritize-home-ram to get back the old behaviour.")
 
-	const playerData = await getNsDataThroughFile(ns, 'ns.getPlayer()', '/Temp/player-info.txt');
-
 	// Kill every script except this one, since it can interfere with out spending
 	let pid = await runCommand(ns, `ns.ps().filter(s => s.filename != ns.args[0]).forEach(s => ns.kill(s.pid));`,
 		'/Temp/kill-everything-but.js', [ns.getScriptName()]);
 	await waitForProcessToComplete(ns, pid, true); // Wait for the script to shut down, indicating it has shut down other scripts
 
 	// Stop the current action so that we're no longer spending money (if training) and can collect rep earned (if working)
-	await getNsDataThroughFile(ns, 'ns.singularity.stopAction()', '/Temp/stop-player-action.txt');
+	await getNsDataThroughFile(ns, 'ns.singularity.stopAction()');
 
 	// Clear any global reserve so that all money can be spent
 	await ns.write("reserve.txt", 0, "w");
@@ -53,8 +51,11 @@ export async function main(ns) {
 	// STEP 1: Liquidate Stocks and (SF9) Hacknet Hashes
 	log(ns, 'Sell stocks and hashes...', true, 'info');
 	ns.run(getFilePath('spend-hacknet-hashes.js'), 1, '--liquidate');
-	const stkSymbols = await getStockSymbols(ns);
-	if (stkSymbols != null) {
+
+	// If we do not have tix api access, we cannot automate checking on or selling stocks, so skip this
+	const hasTixApiAccess = await getNsDataThroughFile(ns, 'ns.stock.hasTIXAPIAccess()');
+	if (hasTixApiAccess) {
+		const stkSymbols = await getStockSymbols(ns);
 		const countOwnedStocks = async () => await getNsDataThroughFile(ns, `ns.args.map(sym => ns.stock.getPosition(sym))` +
 			`.reduce((t, stk) => t + (stk[0] + stk[2] > 0 ? 1 : 0), 0)`, '/Temp/owned-stocks.txt', stkSymbols);
 		let ownedStocks;
@@ -78,21 +79,25 @@ export async function main(ns) {
 
 	// STEP 3: (SF13) STANEK'S GIFT
 	// There is now an API to accept stanek's gift without resorting to exploits. We must do this before installing augs for the first time
-	if (13 in dictSourceFiles)
+	if (13 in dictSourceFiles) {
+		// By feature request: Auto-skip stanek in BN8 (requires a separate API check to get current BN)
+		let isInBn8 = 8 === (await getNsDataThroughFile(ns, `ns.getResetInfo()`)).currentNode;
+
 		if (options['skip-staneks-gift'])
 			log(ns, 'INFO: --skip-staneks-gift was set, we will not accept it.');
-		else if (playerData.bitNodeN == 8) {
+		else if (isInBn8) {
 			log(ns, 'INFO: Stanek\'s gift is useless in BN8, setting the --skip-staneks-gift argument automatically.');
 			options['skip-staneks-gift'] = true;
 		} else {
 			log(ns, 'Accepting Stanek\'s Gift (if this is the first reset)...', true, 'info');
-			const haveStanek = await getNsDataThroughFile(ns, `ns.stanek.acceptGift()`, '/Temp/stanek-acceptGift.txt');
+			const haveStanek = await getNsDataThroughFile(ns, `ns.stanek.acceptGift()`);
 			if (haveStanek) log(ns, 'INFO: Confirmed that we have Stanek\'s Gift', true, 'info');
 			else {
 				log(ns, 'WARNING: It looks like we can\'t get Stanek\'s Gift. (Did you manually purchase some augmentations?)', true, 'warning');
 				options['skip-staneks-gift'] = true; // Nothing we can do, no point in failing our augmentation install
 			}
 		}
+	}
 
 	// STEP 4: Buy as many desired augmentations as possible
 	log(ns, 'Purchasing augmentations...', true, 'info');
@@ -104,7 +109,7 @@ export async function main(ns) {
 	pid = ns.run(getFilePath('faction-manager.js'), 1, ...facmanArgs);
 	await waitForProcessToComplete(ns, pid, true); // Wait for the script to shut down, indicating it is done.
 
-	// Sanity check, if we are not slated to install any augmentations, ABORT
+	// If we are not slated to install any augmentations, ABORT
 	// Get owned + purchased augmentations, then installed augmentations. Ensure there's a difference
 	let purchasedAugmentations = await getNsDataThroughFile(ns, 'ns.singularity.getOwnedAugmentations(true)', '/Temp/player-augs-purchased.txt');
 	let installedAugmentations = await getNsDataThroughFile(ns, 'ns.singularity.getOwnedAugmentations()', '/Temp/player-augs-installed.txt');
@@ -118,11 +123,11 @@ export async function main(ns) {
 
 	// STEP 5: Try to Buy 4S data / API if we haven't already and can afford it (although generally stockmaster.js would have bought these if it could)
 	log(ns, 'Checking on Stock Market upgrades...', true, 'info');
-	await getNsDataThroughFile(ns, 'ns.stock.purchaseWseAccount()', '/Temp/stock-purchaseWseAccount.txt');
-	let hasStockApi = await getNsDataThroughFile(ns, 'ns.stock.purchaseTixApi()', '/Temp/stock-purchaseTixApi.txt');
+	await getNsDataThroughFile(ns, 'ns.stock.purchaseWseAccount()');
+	let hasStockApi = await getNsDataThroughFile(ns, 'ns.stock.purchaseTixApi()');
 	if (hasStockApi) {
-		await getNsDataThroughFile(ns, 'ns.stock.purchase4SMarketData()', '/Temp/stock-purchase4SMarketData.txt');
-		await getNsDataThroughFile(ns, 'ns.stock.purchase4SMarketDataTixApi()', '/Temp/stock-purchase4SMarketDataTixApi.txt');
+		await getNsDataThroughFile(ns, 'ns.stock.purchase4SMarketData()');
+		await getNsDataThroughFile(ns, 'ns.stock.purchase4SMarketDataTixApi()');
 	}
 
 	// STEP 6: (SF10) Buy whatever sleeve upgrades we can afford
@@ -145,7 +150,7 @@ export async function main(ns) {
 	await waitForProcessToComplete(ns, pid, true); // Wait for the script to shut down, indicating it has bought all it can.
 
 	// STEP 9: Join every faction we've been invited to (gives a little INT XP)
-	let invites = await getNsDataThroughFile(ns, 'ns.singularity.checkFactionInvitations()', '/Temp/faction-invitations.txt');
+	let invites = await getNsDataThroughFile(ns, 'ns.singularity.checkFactionInvitations()');
 	if (invites.length > 0) {
 		pid = await runCommand(ns, 'ns.args.forEach(f => ns.singularity.joinFaction(f))', '/Temp/join-factions.js', invites);
 		await waitForProcessToComplete(ns, pid, true);
@@ -160,12 +165,22 @@ export async function main(ns) {
 	while (ticksWithoutPurchases < options['ticks-to-wait-for-additional-purchases'] && (Date.now() < maxWait)) {
 		const start = Date.now(); // Used to wait for the game to tick.
 		const refreshMoney = async () => money =
-			await getNsDataThroughFile(ns, `ns.getServerMoneyAvailable(ns.args[0])`, `/Temp/getServerMoneyAvailable.txt`, ["home"]);
+			await getNsDataThroughFile(ns, `ns.getServerMoneyAvailable(ns.args[0])`, null, ["home"]);
 		while ((Date.now() - start <= 200) && lastMoney == await refreshMoney())
 			await ns.sleep(10); // Wait for game to tick (money to change) - might happen sooner than 200ms
 		ticksWithoutPurchases = money < lastMoney ? 0 : ticksWithoutPurchases + 1;
 		lastMoney = money;
 	}
+
+	// TODO STEP 11: Accept any outstanding faction invitations, and claim our +1 free favour if available.
+	/*
+	const factionInvites = ns.singularity.checkFactionInvitations()
+	if (factionInvites.length > 0)
+		factionInvites.forEach(factionName => ns.singularity.joinFaction(factionName));
+	if (ns.singularity.exportGameBonus())
+		ns.singularity.exportGame();
+	// TODO: No way to close the pop-up save dialog, which is a deal-breaker for me.
+	*/
 
 	// STEP 4 REDUX: If somehow we have money left over and can afford some junk augs that weren't on our desired list, grab them too
 	log(ns, 'Seeing if we can afford any other augmentations...', true, 'info');
@@ -173,7 +188,8 @@ export async function main(ns) {
 	pid = ns.run(getFilePath('faction-manager.js'), 1, ...facmanArgs);
 	await waitForProcessToComplete(ns, pid, true); // Wait for the script to shut down, indicating it is done.
 
-	// Clean up our temp folder - it's good to do this once in a while to reduce the save footprint.
+	// Clean up our temp folder - it's good to do this once in a while to reduce the save footprint
+	// As well as to ensure that data written out on this bitnode don't confuse scripts in the next one.
 	await waitForProcessToComplete(ns, ns.run(getFilePath('cleanup.js')), true);
 
 	// FINALLY: If configured, soft reset
@@ -184,9 +200,9 @@ export async function main(ns) {
 			// Default script (if none is specified) is stanek.js if we have it (which in turn will spawn daemon.js when done)
 			(purchasedAugmentations.includes(`Stanek's Gift - Genesis`) ? getFilePath('stanek.js') : getFilePath('daemon.js'));
 		if (noAugsToInstall)
-			await runCommand(ns, `ns.singularity.softReset(ns.args[0])`, '/Temp/soft-reset.js', [resetScript]);
+			await runCommand(ns, `ns.singularity.softReset(ns.args[0])`, null, [resetScript]);
 		else
-			await runCommand(ns, `ns.singularity.installAugmentations(ns.args[0])`, '/Temp/install-augmentations.js', [resetScript]);
+			await runCommand(ns, `ns.singularity.installAugmentations(ns.args[0])`, null, [resetScript]);
 	} else
 		log(ns, `SUCCESS: Ready to ascend. In the future, you can run with --reset (or --install-augmentations) ` +
 			`to actually perform the reset automatically.`, true, 'success');

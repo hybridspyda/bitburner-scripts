@@ -49,9 +49,9 @@ let planStatsCount = 0;
 let planBoostersCount = 0;
 
 /** @typedef {{ key: number, fragment: Fragment, x: number; y: number; rot: number;
-  *             coords: [number, number][]; adjacent: [number, number][];
-  *             adjacentBoosters: Int16Array; adjacentStats: Int16Array;
-  *             overlapWithBoosters: Int16Array; overlapWithStats: Int16Array }} Placement */
+	*             coords: [number, number][]; adjacent: [number, number][];
+	*             adjacentBoosters: Int16Array; adjacentStats: Int16Array;
+	*             overlapWithBoosters: Int16Array; overlapWithStats: Int16Array }} Placement */
 /** @typedef {{ stats: Placement[]; boosters: Placement[] }} Plan */
 
 export function autocomplete(data, args) {
@@ -74,9 +74,9 @@ export async function main(ns) {
 	// 1. Set up priority order of stat fragments to include
 	const targetIds = [
 		FragmentId.Rep, FragmentId.Hacking2, FragmentId.Hacking1, // Basics, always want
-		, FragmentId.HackingSpeed, // Priority 2, improve hack EXP gain and income?
-		, FragmentId.HacknetMoney, FragmentId.HacknetCost // Priority 3, hacknet good for lots of things?
-		, FragmentId.HackingGrow, FragmentId.HackingMoney // Priority 4, improves growth, income for RAM from hacking?
+		FragmentId.HackingSpeed, // Priority 2, improve hack EXP gain and income?
+		FragmentId.HacknetMoney, FragmentId.HacknetCost, // Priority 3, hacknet good for lots of things?
+		FragmentId.HackingGrow, FragmentId.HackingMoney // Priority 4, improves growth, income for RAM from hacking?
 		//etc...
 	];
 	const allFragments = ns.stanek.fragmentDefinitions();
@@ -369,7 +369,7 @@ function coverage(x0, y0, rotation, fragment) {
 
 /** @param {number} width
  *  @param {number} height
- *  @param {[number, number][]} coords 
+ *  @param {[number, number][]} coords
  *  @return {[number, number][]} */
 function adjacents(width, height, coords) {
 	const adjacent = [...new Array(width)].map(() => [...new Array(height)].map(() => false));

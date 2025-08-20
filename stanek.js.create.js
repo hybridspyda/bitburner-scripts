@@ -17,14 +17,14 @@ export async function main(ns) {
 
 	// Check if stanek was previously placed
 	if (!options['clear']) {
-		const fragments = await getNsDataThroughFile(ns, 'ns.stanek.activeFragments()', '/Temp/stanek-activeFragments.txt');
+		const fragments = await getNsDataThroughFile(ns, 'ns.stanek.activeFragments()');
 		if (fragments.length > 0)
 			return log(ns, `WARNING: Nothing to do, you've already populated Stanek's Gift. Exiting...`, true);
 	}
 
-	// Find the saved layout that best matches 
-	const height = options['force-height'] || await getNsDataThroughFile(ns, 'ns.stanek.giftHeight()', '/Temp/stanek-giftHeight.txt');
-	const width = options['force-width'] || await getNsDataThroughFile(ns, 'ns.stanek.giftWidth()', '/Temp/stanek-giftWidth.txt');
+	// Find the saved layout that best matches
+	const height = options['force-height'] || await getNsDataThroughFile(ns, 'ns.stanek.giftHeight()');
+	const width = options['force-width'] || await getNsDataThroughFile(ns, 'ns.stanek.giftWidth()');
 	const usableLayouts = layouts.filter(l => l.height <= height && l.width <= width);
 	const bestLayout = usableLayouts.sort((l1, l2) => // Use the layout with the least amount of unused rows/columns
 		(height - l1.height + width - l1.width) - (height - l2.height + width - l2.width))[0];
@@ -35,6 +35,17 @@ export async function main(ns) {
 	if (options['clear']) {
 		await getNsDataThroughFile(ns, 'ns.stanek.clearGift() || true', '/Temp/stanek-clearGift.txt');
 		log(ns, 'Cleared any existing stanek layout.');
+	}
+
+	// If we're in a bladeburner BN, and there's no bladeburner piece in our selected layout (id=30),
+	// replace the identically shaped hacking multi piece  with this one.
+	const has0butNot30 = bestLayout.fragments.some(p => p.id == 0) && !bestLayout.fragments.some(p => p.id == 30);
+	if (has0butNot30) {
+		const bitnodeN = (await getNsDataThroughFile(ns, 'ns.getResetInfo()')).currentNode;;
+		if (bitnodeN == 6 || bitnodeN == 7) {
+			log(ns, `We're in a bladeburner node, replacing a hack piece with the bladeburner piece.`);
+			bestLayout.fragments.find(p => p.id == 0).id = 30;
+		}
 	}
 
 	// Place the layout
