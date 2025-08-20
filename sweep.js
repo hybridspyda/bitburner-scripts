@@ -2,6 +2,7 @@ import HackableBaseServer from "/if/server.hackable.js"
 import BasePlayer from "/if/player.js";
 import { scriptRunWithDelay, scriptContractor } from "/var/constants.js";
 import { dpList } from "/lib/utils.js";
+import { formatMoney} from './helpers.js'
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -46,8 +47,8 @@ export async function main(ns) {
 
 			if (server.money.max != 0) {
 				let securityRating = (server.security.level - server.security.min).toFixed(2);
-				let saturation = (server.money.available / server.money.max * 100).toFixed(2);
-				let moneymax = ns.formatNumber(server.money.max);
+				let saturation = ns.formatPercent(server.money.available / server.money.max);
+				let moneymax = formatMoney(server.moneyMax ?? 0, 4, 1);
 				let variant = "ERROR";
 				let icon = "☠️";
 				if (saturation != 100.00 && securityRating < 2) {
@@ -58,7 +59,7 @@ export async function main(ns) {
 					icon = "🤑";
 				}
 
-				let msg = `(${securityRating}) [${saturation}% of ${moneymax}]`;
+				let msg = `(${securityRating}) [${saturation} of ${moneymax}]`;
 				ns.print(
 					`${variant}\t${contracts[0] ? "📜" : "  "
 					}${!server.admin ? " 🔒" : unlocked ? " 🔑" : "   "
