@@ -59,8 +59,7 @@ export async function main(ns) {
 					icon = "🤑";
 				}
 
-				let msg = `(${securityRating}) `+((server.money.max ?? 0 > 0 ? `${formatMoney(server.money.available ?? 0, 4, 1).padStart(7)} / ` : '') +
-					`${formatMoney(server.money.max ?? 0, 4, 1).padStart(7)} `).padEnd(18)+` [${saturation} of ${moneymax}]`;
+				let msg = `(${securityRating}) [${saturation} of ${moneymax}]`;
 				ns.print(
 					`${variant}\t${contracts[0] ? "📜" : "  "
 					}${!server.admin ? " 🔒" : unlocked ? " 🔑" : "   "
