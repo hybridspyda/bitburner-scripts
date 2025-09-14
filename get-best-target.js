@@ -23,5 +23,5 @@ export async function main(ns) {
 		moneyMax: s.moneyMax,
 		hasAdminRights: s.hasAdminRights,
 		hackDifficulty: s.hackDifficulty,
-	}))));
+	}))), 'w');
 }

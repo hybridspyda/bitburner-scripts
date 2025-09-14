@@ -32,11 +32,15 @@ export async function main(ns) {
 
 	recursiveScan(ns, '', 'home', server, route);
 	for (const i in route) {
-		await ns.sleep(500);
+		await ns.sleep(250);
 		const extra = i > 0 ? "└ " : "";
 		ns.tprint(`${" ".repeat(i)}${extra}${route[i]}`);
 	}
-	ns.tprint(`${route.join('; connect ')}`);
+	const terminalInput = eval("document.getElementById('terminal-input')");
+	terminalInput.value = `${route.join('; connect ')}; ls`;
+	const handler = Object.keys(terminalInput)[1];
+	terminalInput[handler].onChange({target:terminalInput});
+	terminalInput[handler].onKeyDown({key:'Enter',preventDefault:()=>null});
 }
 
 export function autocomplete(data, args) {

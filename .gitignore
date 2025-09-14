@@ -1,4 +1,5 @@
 
 *.txt
+!alias-commands.txt
 .vscode/*.*
 *.ts

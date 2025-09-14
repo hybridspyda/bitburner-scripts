@@ -1,3 +1,8 @@
+export function autocomplete(data, args) {
+	return data.servers;
+}
+
+/** @param {NS} ns */
 export async function main(ns) {
 	const args = ns.flags([["help", false]]);
 	const server = ns.args[0];
@@ -17,8 +22,8 @@ export async function main(ns) {
 	ns.tprint(`
 
 ${server}:
-	RAM        : ${usedram} / ${maxram} (${maxram / usedram * 100}%)
-	$          : ${ns.nFormat(money, "$0.000a")} / ${ns.nFormat(maxMoney, "$0.000a")} (${(money / maxMoney * 100).toFixed(2)}%)
+	RAM        : ${ns.formatRAM(usedram)} / ${ns.formatRAM(maxram)} (${ns.formatPercent(maxram / usedram)})
+	$          : $${ns.formatNumber(money, 3)} / $${ns.formatNumber(maxMoney, 3)} (${ns.formatPercent(money / maxMoney)})
 	security   : ${minSec.toFixed(2)} / ${sec.toFixed(2)}
 	growth     : ${ns.getServerGrowth(server)}
 	hack time  : ${ns.tFormat(ns.getHackTime(server))}
