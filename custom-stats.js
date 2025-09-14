@@ -66,6 +66,35 @@ export async function main(ns) {
 				headers.push('BitNode')
 				let bitNode = ns.getResetInfo().currentNode;
 				values.push(`${bitNode}`);
+
+				const sfLevels = {};
+				const player = ns.getPlayer();
+				let hasSourceFiles = false;
+				if (player.sourceFiles && player.sourceFiles.length > 0) {
+					hasSourceFiles = true;
+					for (const sf of player.sourceFiles) {
+						sfLevels[sf.n] = sf.lvl;
+					}
+				}
+
+				let nextBN = null;
+				if (hasSourceFiles) {
+					for (const bn of defaultBnOrder) {
+						const bnNum = Math.floor(bn); // e.g. 4.3 -> 4
+						const sfLevel = sfLevels[bnNum] || 0;
+						if (sfLevel < 3) {
+							nextBn = bn;
+							break;
+						}
+					}
+				} else {
+					nextBN = defaultBnOrder[0]; // No source files, so next BN is the first one
+				}
+
+				if (nextBN !== null) {
+					headers.push('Next BN Goal');
+					values.push(`BN${nextBN} (SF${Math.floor(nextBN)}.${sfLevels[Math.floor(nextBN)] || 0}/3)`);
+				}
 			}
 
 			// Add script income per second
@@ -78,7 +107,7 @@ export async function main(ns) {
 			// Add script exp gain rate per second
 			{
 				headers.push('ScrExp');
-				let scrExp = ns.getTotalScriptExpGain().toPrecision(2);
+				let scrExp = ns.formatNumber(ns.getTotalScriptExpGain(), 3);
 				values.push(`${scrExp}/sec`);
 			}
 

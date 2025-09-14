@@ -1,6 +1,6 @@
 let options;
 const argsSchema = [
-	['script', 'early-hack-template.js'],
+	['script', 'bot-commander.js'],
 	['target', 'n00dles'],
 	['threadCount', 1]
 ];

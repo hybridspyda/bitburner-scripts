@@ -1,7 +1,7 @@
 let options;
 const argsSchema = [
 	['RAM', 8],
-	['script', 'early-hack-template.js'],
+	['script', 'bot-commander.js'],
 	['target', 'n00dles']
 ];
 

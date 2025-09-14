@@ -1,6 +1,6 @@
 /** Helper to get a list of all hostnames on the network
- * @param {NS} ns The netscript instance passed to your script.s main entry point
- * @returns {string[]} **/
+ * @param {NS} ns The netscript instance passed to your script's main entry point
+ * @returns {string[]} discoveredHosts */
 export function scanAllServers(ns) {
 	let discoveredHosts = []; // Hosts (a.k.a servers) we have scanned
 	let hostsToScan = ["home"]; // Hosts we know about, but have not yet scanned

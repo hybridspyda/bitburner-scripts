@@ -1,39 +1,26 @@
-function scan(ns, parent, server, list) {
-	const children = ns.scan(server);
-	for (let child of children) {
-		if (parent == child) {
-			continue;
-		}
-		list.push(child);
+import { scanAllServers } from './helpers.js'
 
-		scan(ns, server, child, list);
-	}
+export function autocomplete(data, _) {
+	return data.servers;
 }
 
-export function list_servers(ns) {
-	const list = [];
-	scan(ns, '', 'home', list);
-	return list;
-}
-
+/** @param {NS} ns */
 export async function main(ns) {
-	const args = ns.flags([["help", false]]);
-	if (args.help) {
-		ns.tprint("This script helps you find an unsolved coding contract.");
-		ns.tprint(`Usage: run ${ns.getScriptName()}`);
-		ns.tprint("Example:");
-		ns.tprint(`> run ${ns.getScriptName()}`);
+	ns.disableLog('scan');
+	ns.disableLog('sleep');
+	ns.clearLog();
+
+	let serverNames = scanAllServers(ns);
+	let foundContracts = [];
+	for (let hostname of serverNames) {
+		if (ns.ls(hostname).find(f => f.endsWith('.cct')))
+			foundContracts.push(hostname);
+	}
+	ns.print(JSON.stringify(foundContracts));
+	if (foundContracts.length == 0) {
+		ns.tprint("No coding contracts found.");
 		return;
 	}
 
-	let servers = list_servers(ns);
-	const boughtServers = ns.getPurchasedServers(ns);
-	servers = servers.filter(s => !boughtServers.includes(s));
-	const hostname = servers.find(s => ns.ls(s).find(f => f.endsWith(".cct")))
-	if (!hostname) {
-		ns.tprint("No coding contract found.");
-		return;
-	}
-
-	ns.tprint(`Found coding contract on '${hostname}'.`)
+	ns.tprint(`Found coding contract on the following servers: '${foundContracts.join(', ')}'.`)
 }
