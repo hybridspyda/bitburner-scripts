@@ -1,6 +1,8 @@
 
-*.txt
-!alias-commands.txt
+src/*.txt
+src/!alias-commands.txt
 .vscode/*.*
-*.ts
-filesync.json
+src/*.ts
+node_modules/
+dist/
+NetscriptDefinitions.d.ts
