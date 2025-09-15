@@ -3,3 +3,4 @@
 !alias-commands.txt
 .vscode/*.*
 *.ts
+filesync.json

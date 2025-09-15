@@ -5,7 +5,8 @@ const argsSchema = [
 ];
 
 export function autocomplete(data, _) {
-	return data.servers;
+	data.flags(argsSchema);
+	return [];
 }
 
 /** @param {NS} ns */
@@ -41,16 +42,17 @@ export async function main(ns) {
 			ns.print(`   ${ns.codingcontract.getDescription(contract, server)}`);
 			ns.print(`   ${ns.codingcontract.getData(contract, server)}`);
 
-			if (!attemptToSolve) continue;
-
-			ns.print(`   Attempting to solve...`);
+			
 			let answer = solve(type, ns.codingcontract.getData(contract, server), ns);
-			ns.print(`   Answer: ${answer}`);
-
 			if (answer === "") {
 				ns.tprint(`   No answer found.`);
 				continue;
+			} else {
+				ns.print(`   Answer: ${answer}`);
 			}
+			
+			if (!attemptToSolve) continue;
+			ns.print(`   Attempting to solve...`);
 			const reward = ns.codingcontract.attempt(answer, contract, server, { returnReward: true });
 			if (reward) {
 				ns.tprint(`   SUCCESS! Reward: ${reward}`);
@@ -63,23 +65,71 @@ export async function main(ns) {
 
 function solve(contractType, data, ns) {
 	switch (contractType) {
-		case "Encryption I: Caesar Cipher":
+		case "Algorithmic Stock Trader I":
 			{
-				// Bitburner provides [message, shift] not [shift, message]
-				const [message, shift] = data;
-				const aCode = 'A'.charCodeAt(0);
-				const zCode = 'Z'.charCodeAt(0);
-				let decrypted = '';
-				for (let char of message) {
-					let code = char.charCodeAt(0);
-					if (code >= aCode && code <= zCode) {
-						let newCode = ((code - aCode - shift + 26) % 26) + aCode;
-						decrypted += String.fromCharCode(newCode);
-					} else {
-						decrypted += char;
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Algorithmic Stock Trader II":
+			{
+				let profit = 0;
+				for (let p = 1; p < data.length; ++p) {
+					profit += Math.max(data[p] - data[p - 1], 0);
+				}
+				return profit.toString();
+			}
+		case "Algorithmic Stock Trader III":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Algorithmic Stock Trader IV":
+			{
+				const k = data[0];
+				const prices = data[1];
+				const len = prices.length;
+				if (len < 2) {
+					return 0;
+				}
+				if (k > len / 2) {
+					let res = 0;
+					for (let i = 1; i < len; ++i) {
+						res += Math.max(prices[i] - prices[i - 1], 0);
+					}
+					return res;
+				}
+				const hold = [];
+				const rele = [];
+				hold.length = k + 1;
+				rele.length = k + 1;
+				for (let i = 0; i <= k; ++i) {
+					hold[i] = Number.MIN_SAFE_INTEGER;
+					rele[i] = 0;
+				}
+				let cur;
+				for (let i = 0; i < len; ++i) {
+					cur = prices[i];
+					for (let j = k; j > 0; --j) {
+						rele[j] = Math.max(rele[j], hold[j] + cur);
+						hold[j] = Math.max(hold[j], rele[j - 1] - cur);
 					}
 				}
-				return decrypted;
+				return rele[k];
+			}
+		case "Array Jumping Game":
+			{
+				const n = data.length
+				let i = 0
+				for (let reach = 0; i < n && i <= reach; ++i) {
+					reach = Math.max(i + data[i], reach)
+				}
+				const solution = i === n
+				return solution ? 1 : 0
+			}
+		case "Array Jumping Game II":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
 			}
 		case "Compression III: LZ Compression":
 			{
@@ -188,6 +238,124 @@ function solve(contractType, data, ns) {
 				}
 
 				return result ?? "";
+			}
+		case "Compression II: LZ Decompression":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Compression I: RLE Compression":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Encryption I: Caesar Cipher":
+			{
+				// Bitburner provides [message, shift] not [shift, message]
+				const [message, shift] = data;
+				const aCode = 'A'.charCodeAt(0);
+				const zCode = 'Z'.charCodeAt(0);
+				let decrypted = '';
+				for (let char of message) {
+					let code = char.charCodeAt(0);
+					if (code >= aCode && code <= zCode) {
+						let newCode = ((code - aCode - shift + 26) % 26) + aCode;
+						decrypted += String.fromCharCode(newCode);
+					} else {
+						decrypted += char;
+					}
+				}
+				return decrypted;
+			}
+		case "Encryption II: Vigenère Cipher":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Find All Valid Math Expressions":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Find Largest Prime Factor":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Generate IP Addresses":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "HammingCodes: Encoded Binary to Integer":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "HammingCodes: Integer to Encoded Binary":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Merge Overlapping Intervals":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Minimum Path Sum in a Triangle":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Proper 2-Coloring of a Graph":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Sanitize Parentheses in Expression":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Shortest Path in a Grid":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Spiralize Matrix":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Square Root":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Subarray with Maximum Sum":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Total Ways to Sum":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Total Ways to Sum II":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Unique Paths in a Grid I":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
+			}
+		case "Unique Paths in a Grid II":
+			{
+				ns.print(`'${contractType}' Not Implemented Yet...`);
+				return "";
 			}
 		default:
 			ns.print(`No solver for contract type '${contractType}'`);

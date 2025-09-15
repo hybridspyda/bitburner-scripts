@@ -30,12 +30,14 @@ export async function main(ns) {
 	while (i < ns.getPurchasedServerLimit()) {
 		let hostname = "pserv-" + i;
 		let sExist = ns.serverExists(hostname);
-		let sMaxRam = ns.getServerMaxRam(hostname);
-		let alreadyPurchased = sExist && sMaxRam == RAM;
-		if (alreadyPurchased) {
-			ns.tprint(`✅ Server: ${hostname}, already at target RAM: ${ns.formatRam(RAM, 0)}, skipping...`);
-			++i;
-			continue;
+		let sMaxRam = sExist ? ns.getServerMaxRam(hostname) : 0;
+		if (sExist) {
+			let alreadyPurchased = sExist && sMaxRam == RAM;
+			if (alreadyPurchased) {
+				ns.tprint(`✅ Server: ${hostname}, already at target RAM: ${ns.formatRam(RAM, 0)}, skipping...`);
+				++i;
+				continue;
+			}
 		}
 
 		// Check if we have enough money to purchase a server
@@ -47,8 +49,7 @@ export async function main(ns) {
 			}
 			ns.purchaseServer(hostname, RAM);
 			ns.scp(SCRIPT, hostname, 'home');
-			let optimalThreadCount = Math.floor(RAM / ns.getScriptRam(SCRIPT, 'home'));
-			ns.exec(SCRIPT, hostname, optimalThreadCount, '--target', TARGET, '--threadCount', optimalThreadCount);
+			ns.exec(SCRIPT, hostname, 1, '--target', TARGET, '--hostRAM', RAM);
 			++i;
 		}
 		//Make the script wait for a second before looping again.

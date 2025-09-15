@@ -38,6 +38,7 @@ export async function main(ns) {
 
 	for (const server of servers) {
 		const hostName = server.hostname;
+		if (target === 'self' && server.moneyMax > 0)
 
 		if (hostName !== 'home')
 			ns.scp(script, hostName, 'home');
