@@ -65,7 +65,7 @@ export async function main(ns) {
 			{
 				headers.push('BitNode')
 				let bitNode = ns.getResetInfo().currentNode;
-				values.push(`${bitNode}`);
+				values.push(`${bitNode}.1`);
 
 				const sfLevels = {};
 				const player = ns.getPlayer();
