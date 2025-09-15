@@ -1,7 +1,7 @@
 alias git-pull="run git-pull.js"
 alias csar="run copy-script-and-run.js"
 alias fcc="home; run find_coding_contract.js"
-alias fs="home; run find_server.js"
+alias fs="home; run find_server.js --target"
 alias mon="home; run monitor.js"
 alias best="home; run get-best-target.js"
 alias startup="home; run startup.js"

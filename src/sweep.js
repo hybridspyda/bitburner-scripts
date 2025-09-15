@@ -1,4 +1,4 @@
-import { scanAllServers } from './helpers.js'
+import { scanAllServers, sudo } from './helpers.js'
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -19,17 +19,7 @@ export async function main(ns) {
 			let serverInfoGiven = false;
 			// Gain admin on all servers that we can
 			if (!server.hasAdminRights) {
-				try { ns.brutessh(server.hostName); } catch { }
-				try { ns.ftpcrack(server.hostName); } catch { }
-				try { ns.relaysmtp(server.hostName); } catch { }
-				try { ns.httpworm(server.hostName); } catch { }
-				try { ns.sqlinject(server.hostName); } catch { }
-				try { ns.nuke(server.hostName); } catch { }
-
-				// Refresh server object to see if we now have admin rights
-				server = ns.getServer(server.hostname);
-
-				if (server.hasAdminRights) {
+				if (server.hasAdminRights = sudo(ns, server.hostname)) {
 					unlocked = true;
 					ns.toast(`🔑🔓 ${server.hostname} now unlocked.`);
 				}
@@ -46,15 +36,22 @@ export async function main(ns) {
 			}
 
 			if (server.moneyMax != 0) {
+				const moneyThresh = server.moneyMax * 0.8;
+				const securityThresh = server.minDifficulty + 5;
+
 				let securityRating = (server.hackDifficulty - server.minDifficulty).toFixed(2);
 				let saturation = ns.formatPercent(server.moneyAvailable / server.moneyMax);
 				let moneymax = ns.formatNumber(server.moneyMax);
 				let variant = "ERROR";
 				let icon = "☠️";
-				if (saturation != 100.00 && securityRating < 2) {
+				if (server.hackDifficulty > securityThresh) {
+					// weak
+				} else if (server.moneyAvailable < moneyThresh) {
+					// grow
 					variant = "SUCCESS";
 					icon = "🌱";
-				} else if (saturation == 100 && securityRating < 1) {
+				} else {
+					// hack
 					variant = "INFO";
 					icon = "🤑";
 				}

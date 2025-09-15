@@ -42,7 +42,7 @@ export async function main(ns) {
 			ns.print(`   ${ns.codingcontract.getDescription(contract, server)}`);
 			ns.print(`   ${ns.codingcontract.getData(contract, server)}`);
 
-			
+
 			let answer = solve(type, ns.codingcontract.getData(contract, server), ns);
 			if (answer === "") {
 				ns.tprint(`   No answer found.`);
@@ -50,7 +50,7 @@ export async function main(ns) {
 			} else {
 				ns.print(`   Answer: ${answer}`);
 			}
-			
+
 			if (!attemptToSolve) continue;
 			ns.print(`   Attempting to solve...`);
 			const reward = ns.codingcontract.attempt(answer, contract, server, { returnReward: true });
@@ -128,8 +128,28 @@ function solve(contractType, data, ns) {
 			}
 		case "Array Jumping Game II":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				if (data[0] == 0)
+					return '0';
+				const n = data.length;
+				let reach = 0;
+				let jumps = 0;
+				let lastJump = -1;
+				while (reach < n - 1) {
+					let jumpedFrom = -1;
+					for (let i = reach; i > lastJump; i--) {
+						if (i + data[i] > reach) {
+							reach = i + data[i];
+							jumpedFrom = i;
+						}
+					}
+					if (jumpedFrom === -1) {
+						jumps = 0;
+						break;
+					}
+					lastJump = jumpedFrom;
+					jumps++;
+				}
+				return jumps;
 			}
 		case "Compression III: LZ Compression":
 			{
@@ -241,8 +261,47 @@ function solve(contractType, data, ns) {
 			}
 		case "Compression II: LZ Decompression":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				let compr = data;
+				let plain = "";
+
+				for (let i = 0; i < compr.length;) {
+					const literal_length = compr.charCodeAt(i) - 0x30;
+
+					if (literal_length < 0 || literal_length > 9 || i + 1 + literal_length > compr.length) {
+						return null;
+					}
+
+					plain += compr.substring(i + 1, i + 1 + literal_length);
+					i += 1 + literal_length;
+
+					if (i >= compr.length) {
+						break;
+					}
+					const backref_length = compr.charCodeAt(i) - 0x30;
+
+					if (backref_length < 0 || backref_length > 9) {
+						return null;
+					} else if (backref_length === 0) {
+						++i;
+					} else {
+						if (i + 1 >= compr.length) {
+							return null;
+						}
+
+						const backref_offset = compr.charCodeAt(i + 1) - 0x30;
+						if ((backref_length > 0 && (backref_offset < 1 || backref_offset > 9)) || backref_offset > plain.length) {
+							return null;
+						}
+
+						for (let j = 0; j < backref_length; ++j) {
+							plain += plain[plain.length - backref_offset];
+						}
+
+						i += 2;
+					}
+				}
+
+				return plain;
 			}
 		case "Compression I: RLE Compression":
 			{
@@ -274,18 +333,74 @@ function solve(contractType, data, ns) {
 			}
 		case "Find All Valid Math Expressions":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const num = data[0];
+				const target = data[1];
+
+				function helper(res, path, num, target, pos, evaluated, multed) {
+					if (pos === num.length) {
+						if (target === evaluated) {
+							res.push(path);
+						}
+						return;
+					}
+					for (let i = pos; i < num.length; ++i) {
+						if (i != pos && num[pos] == '0') {
+							break;
+						}
+						const cur = parseInt(num.substring(pos, i + 1));
+						if (pos === 0) {
+							helper(res, path + cur, num, target, i + 1, cur, cur);
+						} else {
+							helper(res, path + '+' + cur, num, target, i + 1, evaluated + cur, cur);
+							helper(res, path + '-' + cur, num, target, i + 1, evaluated - cur, -cur);
+							helper(res, path + '*' + cur, num, target, i + 1, evaluated - multed + multed * cur, multed * cur);
+						}
+					}
+				}
+
+				if (num == null || num.length === 0) {
+					return [];
+				}
+				const result = [];
+				helper(result, '', num, target, 0, 0, 0);
+				return result;
 			}
 		case "Find Largest Prime Factor":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				let fac = 2
+				let n = data
+				while (n > (fac - 1) * (fac - 1)) {
+					while (n % fac === 0) {
+						n = Math.round(n / fac)
+					}
+					++fac
+				}
+				return n === 1 ? fac - 1 : n
 			}
 		case "Generate IP Addresses":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const ret = []
+				for (let a = 1; a <= 3; ++a) {
+					for (let b = 1; b <= 3; ++b) {
+						for (let c = 1; c <= 3; ++c) {
+							for (let d = 1; d <= 3; ++d) {
+								if (a + b + c + d === data.length) {
+									const A = parseInt(data.substring(0, a), 10)
+									const B = parseInt(data.substring(a, a + b), 10)
+									const C = parseInt(data.substring(a + b, a + b + c), 10)
+									const D = parseInt(data.substring(a + b + c, a + b + c + d), 10)
+									if (A <= 255 && B <= 255 && C <= 255 && D <= 255) {
+										const ip = [A.toString(), '.', B.toString(), '.', C.toString(), '.', D.toString()].join('')
+										if (ip.length === data.length + 3) {
+											ret.push(ip)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				return ret.toString(); // Answer expected is the string representation of this array
 			}
 		case "HammingCodes: Encoded Binary to Integer":
 			{
@@ -304,8 +419,14 @@ function solve(contractType, data, ns) {
 			}
 		case "Minimum Path Sum in a Triangle":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const n = data.length;
+				const dp = data[n - 1].slice();
+				for (let i = n - 2; i > -1; --i) {
+					for (let j = 0; j < data[i].length; ++j) {
+						dp[j] = Math.min(dp[j], dp[j + 1]) + data[i][j];
+					}
+				}
+				return dp[0];
 			}
 		case "Proper 2-Coloring of a Graph":
 			{
@@ -314,8 +435,44 @@ function solve(contractType, data, ns) {
 			}
 		case "Sanitize Parentheses in Expression":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				let left = 0;
+				let right = 0;
+				const res = [];
+				for (let i = 0; i < data.length; ++i) {
+					if (data[i] === '(') {
+						++left;
+					} else if (data[i] === ')') {
+						left > 0 ? --left : ++right;
+					}
+				}
+
+				function dfs(pair, index, left, right, s, solution, res) {
+					if (s.length === index) {
+						if (left === 0 && right === 0 && pair === 0) {
+							for (let i = 0; i < res.length; i++) {
+								if (res[i] === solution) {
+									return;
+								}
+							}
+							res.push(solution);
+						}
+						return;
+					}
+					if (s[index] === '(') {
+						if (left > 0) {
+							dfs(pair, index + 1, left - 1, right, s, solution, res);
+						}
+						dfs(pair + 1, index + 1, left, right, s, solution + s[index], res);
+					} else if (s[index] === ')') {
+						if (right > 0) dfs(pair, index + 1, left, right - 1, s, solution, res)
+						if (pair > 0) dfs(pair - 1, index + 1, left, right, s, solution + s[index], res)
+					} else {
+						dfs(pair, index + 1, left, right, s, solution + s[index], res);
+					}
+				}
+				dfs(0, 0, left, right, data, '', res);
+
+				return res;
 			}
 		case "Shortest Path in a Grid":
 			{
@@ -329,8 +486,28 @@ function solve(contractType, data, ns) {
 			}
 		case "Square Root":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				let n = data;
+				const two = BigInt(2);
+				if (n < two) return n; // Square root of 1 is 1, square root of 0 is 0
+				let root = n / two; // Initial guess
+				let x1 = (root + n / root) / two;
+				while (x1 < root) {
+					root = x1;
+					x1 = (root + n / root) / two;
+				}
+				// That's it, solved! At least, we've converged an an answer which should be as close as we can get (might be off by 1)
+				// We want the answer to the "nearest integer". Check the answer on either side of the one we converged on to see what's closest
+				const bigAbs = (x) => x < 0n ? -x : x; // There's no Math.abs where we're going...
+				let absDiff = bigAbs(root * root - n); // How far off we from the perfect square root
+				if (absDiff == 0n) return root; // Note that this coding contract doesn't guarantee there's an exact integer square root
+				else if (absDiff > bigAbs((root - 1n) * (root - 1n) - n)) root = root - 1n; // Do we get a better answer by subtracting 1?
+				else if (absDiff > bigAbs((root + 1n) * (root + 1n) - n)) root = root + 1n; // Do we get a better answer by adding 1?
+				// Validation: We should be able to tell if we got this right without wasting a guess. Adding/Subtracting 1 should now always be worse
+				absDiff = bigAbs(root * root - n);
+				if (absDiff > bigAbs((root - 1n) * (root - 1n) - n) ||
+					absDiff > bigAbs((root + 1n) * (root + 1n) - n))
+					throw new Error(`Square Root did not converge. Arrived at answer:\n${root} - which when squared, gives:\n${root * root} instead of\n${n}`);
+				return root.toString();
 			}
 		case "Subarray with Maximum Sum":
 			{

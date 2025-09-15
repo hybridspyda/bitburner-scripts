@@ -100,8 +100,8 @@ export async function main(ns) {
 			// Add script income per second
 			{
 				headers.push('ScrInc');
-				let scrInc = ns.formatNumber(ns.getTotalScriptIncome()[1], 3);
-				values.push(`$${scrInc}/sec`);
+				let scrInc = ns.getTotalScriptIncome();
+				values.push(`$${ns.formatNumber(scrInc[0])} / ${ns.formatNumber(scrInc[1])}/sec`);
 			}
 
 			// Add script exp gain rate per second

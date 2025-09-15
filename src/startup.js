@@ -1,8 +1,8 @@
-import { scanAllServers } from './helpers.js'
+import { scanAllServers, sudo } from './helpers.js'
 
 let options;
 const argsSchema = [
-	['target', 'n00dles'],
+	['target', 'self'],
 	['script', 'bot-commander.js'],
 	['threadCount', 1]
 ];
@@ -20,48 +20,109 @@ export function autocomplete(data, args) {
 /** @param {NS} ns */
 export async function main(ns) {
 	options = ns.flags(argsSchema);
-	const target = options.target;
+	let target = options.target;
 	const script = options.script;
 	const scriptRAM = ns.getScriptRam(script);
 
 	const UPDATE_TARGET_FLAG = '/Temp/update-target.txt';
+	// Clear out the extra targets file at the start of each run
+	ns.write('/Temp/extra-targets.txt', '', 'w');
 
 	ns.disableLog('scan');
 	ns.clearLog();
 
-	ns.run('./custom-stats.js');
+	if (!ns.scriptRunning('custom-stats.js', 'home'))
+		ns.run('./custom-stats.js');
 
 	let serverNames = [""]; // Provide a type hint to the IDE
 	serverNames = scanAllServers(ns);
 	let servers = serverNames.map(ns.getServer);
-	servers = servers.filter(s => s.maxRam > 0);
+	servers = servers.filter(s => s.maxRam > 0 && !s.purchasedByPlayer);
+	await ns.run('./get-best-target.js');
+	const bestTargets = JSON.parse(ns.read('/Temp/get-best-target.txt'));
 
 	for (const server of servers) {
 		const hostName = server.hostname;
-		if (target === 'self' && server.moneyMax > 0)
+		let serverTarget = target; // Use a local variable
+
+		if (target == 'self') {
+			//ns.tprint(`Server: ${hostName} has ${server.moneyMax}`);
+			if (server.moneyMax > 0) {
+				serverTarget = hostName;
+			} else {
+				serverTarget = bestTargets[0].hostname;
+			}
+		}
 
 		if (hostName !== 'home')
 			ns.scp(script, hostName, 'home');
 		if (ns.scriptRunning(script, hostName)) {
 			const currentTarget = ns.read(UPDATE_TARGET_FLAG, hostName);
-			if (currentTarget !== target) {
-				ns.write(UPDATE_TARGET_FLAG, target, 'w');
+			if (currentTarget !== serverTarget) {
+				ns.write(UPDATE_TARGET_FLAG, serverTarget, 'w');
 				if (hostName !== 'home') {
 					ns.scp(UPDATE_TARGET_FLAG, hostName, 'home');
 					ns.rm(UPDATE_TARGET_FLAG, 'home');
 				}
-				ns.tprint(`${hostName} queued up to target '${target}' next.`);
+				ns.tprint(`${hostName} queued up to target '${serverTarget}' next.`);
 			}
 			continue;
 		}
 
 		if (!server.purchasedByPlayer) {
-			try { ns.brutessh(hostName); } catch { }
-			try { ns.ftpcrack(hostName); } catch { }
-			try { ns.relaysmtp(hostName); } catch { }
-			try { ns.httpworm(hostName); } catch { }
-			try { ns.sqlinject(hostName); } catch { }
-			try { ns.nuke(hostName); } catch { }
+			server.hasAdminRights = sudo(ns, hostName);
+		}
+
+		if (server.maxRam < scriptRAM + 1.75) {
+			ns.tprint(`Not enough RAM on server to run bots... (${hostName}, ${ns.formatRam(server.maxRam)} / ${ns.formatRam(scriptRAM + 1.75)})`);
+			if (server.moneyMax > 0) {
+				ns.tprint(`ADD TO EXTRA ACTION LIST (${hostName})`);
+				ns.print(`ADD TO EXTRA ACTION LIST (${hostName})`);
+				// Append hostname to extra-targets file
+				ns.write('/Temp/extra-targets.txt', hostName + '\n', 'a');
+			}
+			continue;
+		}
+
+		if (server.hasAdminRights) {
+			let threadCount = options.threadCount;
+			if (threadCount > 0)
+				ns.exec(script, hostName, threadCount, '--target', serverTarget, '--hostRAM', server.maxRam);
+		}
+
+		await ns.sleep(2_000);
+	}
+
+	// work with purchased servers
+	servers = serverNames.map(ns.getServer);
+	servers = servers.filter(s => s.purchasedByPlayer && s.hostname !== 'home');
+	if (servers.length === 0) return;
+
+	const extraTargets = ns.read('/Temp/extra-targets.txt')
+		.split('\n')
+		.filter(t => t.trim().length > 0);
+	let extraIndex = 0;
+	for (const server of servers) {
+		const hostName = server.hostname;
+		let serverTarget;
+		if (extraIndex < extraTargets.length) {
+			serverTarget = extraTargets[extraIndex];
+			extraIndex++;
+		} else {
+			serverTarget = bestTargets[0].hostname;
+		}
+
+		ns.scp(script, hostName, 'home');
+		if (ns.scriptRunning(script, hostName)) {
+			const currentTarget = ns.read(UPDATE_TARGET_FLAG, hostName);
+			if (currentTarget !== serverTarget) {
+				ns.write(UPDATE_TARGET_FLAG, serverTarget, 'w');
+				ns.scp(UPDATE_TARGET_FLAG, hostName, 'home');
+				ns.rm(UPDATE_TARGET_FLAG, 'home');
+
+				ns.tprint(`${hostName} queued up to target '${serverTarget}' next.`);
+			}
+			continue;
 		}
 
 		if (server.maxRam < scriptRAM + 1.75) {
@@ -69,12 +130,11 @@ export async function main(ns) {
 			continue;
 		}
 
-		if (server.hasAdminRights) {
-			let threadCount = options.threadCount;
-			if (threadCount > 0)
-				ns.exec(script, hostName, threadCount, '--target', target, '--hostRAM', server.maxRam);
-		}
+		let threadCount = options.threadCount;
+		if (threadCount > 0)
+			ns.exec(script, hostName, threadCount, '--target', serverTarget, '--hostRAM', server.maxRam);
 
 		await ns.sleep(2_000);
 	}
+	try { ns.rm('/Temp/extra-targets.txt', 'home'); } catch { }
 }

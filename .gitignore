@@ -1,8 +1,8 @@
-
 src/*.txt
 src/!alias-commands.txt
 .vscode/*.*
 src/*.ts
+
 node_modules/
 dist/
 NetscriptDefinitions.d.ts
