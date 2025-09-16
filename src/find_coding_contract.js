@@ -67,8 +67,13 @@ function solve(contractType, data, ns) {
 	switch (contractType) {
 		case "Algorithmic Stock Trader I":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				let maxCur = 0
+				let maxSoFar = 0
+				for (let i = 1; i < data.length; ++i) {
+					maxCur = Math.max(0, (maxCur += data[i] - data[i - 1]))
+					maxSoFar = Math.max(maxCur, maxSoFar)
+				}
+				return maxSoFar.toString()
 			}
 		case "Algorithmic Stock Trader II":
 			{
@@ -80,8 +85,17 @@ function solve(contractType, data, ns) {
 			}
 		case "Algorithmic Stock Trader III":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				let hold1 = Number.MIN_SAFE_INTEGER
+				let hold2 = Number.MIN_SAFE_INTEGER
+				let release1 = 0
+				let release2 = 0
+				for (const price of data) {
+					release2 = Math.max(release2, hold2 + price)
+					hold2 = Math.max(hold2, release1 - price)
+					release1 = Math.max(release1, hold1 + price)
+					hold1 = Math.max(hold1, price * -1)
+				}
+				return release2.toString()
 			}
 		case "Algorithmic Stock Trader IV":
 			{
@@ -328,8 +342,16 @@ function solve(contractType, data, ns) {
 			}
 		case "Encryption II: Vigenère Cipher":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				// data = [plaintext, keyword]
+				// build char array, shifting via map and corresponding keyword letter and join to final results
+				const cipher = [...data[0]]
+					.map((a, i) => {
+						return a === " "
+							? a
+							: String.fromCharCode(((a.charCodeAt(0) - 2 * 65 + data[1].charCodeAt(i % data[1].length)) % 26) + 65);
+					})
+					.join("");
+				return cipher;
 			}
 		case "Find All Valid Math Expressions":
 			{
@@ -404,8 +426,50 @@ function solve(contractType, data, ns) {
 			}
 		case "HammingCodes: Encoded Binary to Integer":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				//check for altered bit and decode
+				const build = data.split(""); // ye, an array for working, again
+				const testArray = []; //for the "truthtable". if any is false, the data has an altered bit, will check for and fix it
+				const sumParity = Math.ceil(Math.log2(data.length)); // sum of parity for later use
+				const count = (arr, val) => arr.reduce((a, v) => (v === val ? a + 1 : a), 0);
+				// the count.... again ;)
+				let overallParity = build.splice(0, 1).join(""); // store first index, for checking in next step and fix the build properly later on
+				testArray.push(overallParity == (count(build, "1") % 2).toString() ? true : false); // first check with the overall parity bit
+				for (let i = 0; i < sumParity; i++) {
+					// for the rest of the remaining parity bits we also "check"
+					const tempIndex = Math.pow(2, i) - 1; // get the parityBits Index
+					const tempStep = tempIndex + 1; // set the stepsize
+					const tempData = [...build]; // get a "copy" of the build-data for working
+					const tempArray = []; // init empty array for "testing"
+					while (tempData[tempIndex] != undefined) {
+						// extract from the copied data until the "starting" index is undefined
+						const temp = [...tempData.splice(tempIndex, tempStep * 2)]; // extract 2*stepsize
+						tempArray.push(...temp.splice(0, tempStep)); // and cut again for keeping first half
+					}
+					const tempParity = tempArray.shift(); // and again save the first index separated for checking with the rest of the data
+					testArray.push(tempParity == (count(tempArray, "1") % 2).toString() ? true : false);
+					// is the tempParity the calculated data? push answer into the 'truthtable'
+				}
+				let fixIndex = 0; // init the "fixing" index and start with 0
+				for (let i = 1; i < sumParity + 1; i++) {
+					// simple binary adding for every boolean in the testArray, starting from 2nd index of it
+					fixIndex += testArray[i] ? 0 : Math.pow(2, i) / 2;
+				}
+				build.unshift(overallParity); // now we need the "overall" parity back in it's place
+				// try fix the actual encoded binary string if there is an error
+				if (fixIndex > 0 && testArray[0] == false) { // if the overall is false and the sum of calculated values is greater equal 0, fix the corresponding hamming-bit
+					build[fixIndex] = build[fixIndex] == "0" ? "1" : "0";
+				} else if (testArray[0] == false) { // otherwise, if the the overallparity is the only wrong, fix that one
+					overallParity = overallParity == "0" ? "1" : "0";
+				} else if (testArray[0] == true && testArray.some((truth) => truth == false)) {
+					return 0; // ERROR: There's some strange going on... 2 bits are altered? How? This should not happen
+				}
+				// oof.. halfway through... we fixed an possible altered bit, now "extract" the parity-bits from the build
+				for (let i = sumParity; i >= 0; i--) {
+					// start from the last parity down the 2nd index one
+					build.splice(Math.pow(2, i), 1);
+				}
+				build.splice(0, 1); // remove the overall parity bit and we have our binary value
+				return parseInt(build.join(""), 2); // parse the integer with redux 2 and we're done!
 			}
 		case "HammingCodes: Integer to Encoded Binary":
 			{
@@ -430,8 +494,41 @@ function solve(contractType, data, ns) {
 			}
 		case "Proper 2-Coloring of a Graph":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				// convert from edges to nodes
+				const nodes = new Array(data[0]).fill(0).map(() => [])
+				for (const e of data[1]) {
+					nodes[e[0]].push(e[1])
+					nodes[e[1]].push(e[0])
+				}
+				// solution graph starts out undefined and fills in with 0s and 1s
+				const solution = new Array(data[0]).fill(undefined)
+				let oddCycleFound = false
+				// recursive function for DFS
+				const traverse = (index, color) => {
+					if (oddCycleFound) {
+						// leave immediately if an invalid cycle was found
+						return
+					}
+					if (solution[index] === color) {
+						// node was already hit and is correctly colored
+						return
+					}
+					if (solution[index] === (color ^ 1)) {
+						// node was already hit and is incorrectly colored: graph is uncolorable
+						oddCycleFound = true
+						return
+					}
+					solution[index] = color
+					for (const n of nodes[index]) {
+						traverse(n, color ^ 1)
+					}
+				}
+				// repeat run for as long as undefined nodes are found, in case graph isn't fully connected
+				while (!oddCycleFound && solution.some(e => e === undefined)) {
+					traverse(solution.indexOf(undefined), 0)
+				}
+				if (oddCycleFound) return "[]"; // TODO: Bug #3755 in bitburner requires a string literal. Will this be fixed?
+				return solution
 			}
 		case "Sanitize Parentheses in Expression":
 			{
@@ -481,8 +578,50 @@ function solve(contractType, data, ns) {
 			}
 		case "Spiralize Matrix":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const spiral = []
+				const m = data.length
+				const n = data[0].length
+				let u = 0
+				let d = m - 1
+				let l = 0
+				let r = n - 1
+				let k = 0
+				while (true) {
+					// Up
+					for (let col = l; col <= r; col++) {
+						spiral[k] = data[u][col]
+						++k
+					}
+					if (++u > d) {
+						break
+					}
+					// Right
+					for (let row = u; row <= d; row++) {
+						spiral[k] = data[row][r]
+						++k
+					}
+					if (--r < l) {
+						break
+					}
+					// Down
+					for (let col = r; col >= l; col--) {
+						spiral[k] = data[d][col]
+						++k
+					}
+					if (--d < u) {
+						break
+					}
+					// Left
+					for (let row = d; row >= u; row--) {
+						spiral[k] = data[row][l]
+						++k
+					}
+					if (++l > r) {
+						break
+					}
+				}
+
+				return spiral
 			}
 		case "Square Root":
 			{
@@ -511,28 +650,73 @@ function solve(contractType, data, ns) {
 			}
 		case "Subarray with Maximum Sum":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const nums = data.slice()
+				for (let i = 1; i < nums.length; i++) {
+					nums[i] = Math.max(nums[i], nums[i] + nums[i - 1])
+				}
+				return Math.max.apply(Math, nums)
 			}
 		case "Total Ways to Sum":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const ways = [1]
+				ways.length = data + 1
+				ways.fill(0, 1)
+				for (let i = 1; i < data; ++i) {
+					for (let j = i; j <= data; ++j) {
+						ways[j] += ways[j - i]
+					}
+				}
+				return ways[data]
 			}
 		case "Total Ways to Sum II":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const n = data[0];
+				const s = data[1];
+				const ways = [1];
+				ways.length = n + 1;
+				ways.fill(0, 1);
+				for (let i = 0; i < s.length; i++) {
+					for (let j = s[i]; j <= n; j++) {
+						ways[j] += ways[j - s[i]];
+					}
+				}
+				return ways[n];
 			}
 		case "Unique Paths in a Grid I":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const n = data[0] // Number of rows
+				const m = data[1] // Number of columns
+				const currentRow = []
+				currentRow.length = n
+				for (let i = 0; i < n; i++) {
+					currentRow[i] = 1
+				}
+				for (let row = 1; row < m; row++) {
+					for (let i = 1; i < n; i++) {
+						currentRow[i] += currentRow[i - 1]
+					}
+				}
+				return currentRow[n - 1]
 			}
 		case "Unique Paths in a Grid II":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const obstacleGrid = []
+				obstacleGrid.length = data.length
+				for (let i = 0; i < obstacleGrid.length; ++i) {
+					obstacleGrid[i] = data[i].slice()
+				}
+				for (let i = 0; i < obstacleGrid.length; i++) {
+					for (let j = 0; j < obstacleGrid[0].length; j++) {
+						if (obstacleGrid[i][j] == 1) {
+							obstacleGrid[i][j] = 0
+						} else if (i == 0 && j == 0) {
+							obstacleGrid[0][0] = 1
+						} else {
+							obstacleGrid[i][j] = (i > 0 ? obstacleGrid[i - 1][j] : 0) + (j > 0 ? obstacleGrid[i][j - 1] : 0)
+						}
+					}
+				}
+				return obstacleGrid[obstacleGrid.length - 1][obstacleGrid[0].length - 1]
 			}
 		default:
 			ns.print(`No solver for contract type '${contractType}'`);

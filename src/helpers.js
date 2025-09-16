@@ -1,3 +1,5 @@
+export const STOCK_SYMBOLS = ['ECP', 'MGCP', 'BLD', 'CLRK', 'OMTK', 'FSIG', 'KGI', 'FLCM', 'STM', 'DCOMM', 'HLS', 'VITA', 'ICRS', 'UNV', 'AERO', 'OMN', 'SLRS', 'GPH', 'NVMD', 'WDS', 'LXO', 'RHOC', 'APHE', 'SYSC', 'CTK', 'NTLK', 'OMGA', 'FNS', 'JGN', 'SGC', 'CTYS', 'MDYN', 'TITN'];
+
 /** Helper to get a list of all hostnames on the network
  * @param {NS} ns The netscript instance passed to your script's main entry point
  * @returns {string[]} discoveredHosts */

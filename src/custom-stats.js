@@ -1,4 +1,4 @@
-import { scanAllServers } from './helpers.js'
+import { scanAllServers, STOCK_SYMBOLS } from './helpers.js';
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -15,9 +15,6 @@ export async function main(ns) {
 	ns.disableLog('sleep');
 	ns.clearLog();
 
-	let serverNames = [""]; // Provide a type hint to the IDE
-	serverNames = scanAllServers(ns);
-	let servers = serverNames.map(ns.getServer);
 	const defaultBnOrder = [ // The order in which we intend to play bitnodes
 		// 1st Priority: Key new features and/or major stat boosts
 		4.3,  // Normal. Need singularity to automate everything, and need the API costs reduced from 16x -> 4x -> 1x reliably do so from the start of each BN
@@ -54,113 +51,192 @@ export async function main(ns) {
 		12.9999 // Easy. Keep playing forever. Only stanek scales very well here, there is much work to be done to be able to climb these faster.
 	];
 	const doc = eval("document");
-	const hook0 = doc.getElementById('overview-extra-hook-0');
-	const hook1 = doc.getElementById('overview-extra-hook-1');
+
+	function tryAddStockRow() {
+		const HUD = doc.querySelector(".MuiCollapse-root");
+		if (!HUD) return false;
+
+		const statblock = HUD.querySelector("[class*='MuiBox-root']");
+		if (!statblock) return false;
+
+		const moneyRow = Array.from(statblock.children)
+			.find(row => row.textContent.trim().toLowerCase().startsWith("money"));
+		if (!moneyRow) return false;
+
+		if (statblock.querySelector("#stock-display")) return true;
+
+		const stockRow = moneyRow.cloneNode(true);
+		stockRow.id = "stock-display";
+		if (stockRow.children.length >= 2) {
+			stockRow.children[0].innerText = "Stocks";
+			stockRow.children[1].innerText = "Loading...";
+		}
+
+		moneyRow.insertAdjacentElement("afterend", stockRow);
+		return true;
+	}
+
+	// Keep trying to insert the stock row in the background
+	setInterval(() => {
+		tryAddStockRow();
+	}, 200);
+
+	// Debug tick counter
+	if (!globalThis.__hudTick) globalThis.__hudTick = 0;
+
 	while (true) {
 		try {
-			const headers = []
+			// Refresh server data each tick
+			const serverNames = scanAllServers(ns);
+			const servers = serverNames.map(ns.getServer);
+
+			const stockDisplay = doc.getElementById('stock-display');
+			const hook0 = doc.getElementById('overview-extra-hook-0');
+			const hook1 = doc.getElementById('overview-extra-hook-1');
+
+			if (!hook0 || !hook1) {
+				ns.print("⏳ Waiting for overview hooks...");
+				await ns.sleep(200);
+				continue;
+			}
+
+			const headers = [];
 			const values = [];
+			const stockData = [];
 
-			// Add current bitNode
-			{
-				headers.push('BitNode')
-				let bitNode = ns.getResetInfo().currentNode;
-				values.push(`${bitNode}.1`);
+			// --- Stock Market Status ---
+			try {
+				if (ns.stock.hasWSEAccount() && ns.stock.hasTIXAPIAccess()) {
+					let totalValue = 0;
+					let totalProfit = 0;
+					let anyOwned = false;
 
-				const sfLevels = {};
-				const player = ns.getPlayer();
-				let hasSourceFiles = false;
-				if (player.sourceFiles && player.sourceFiles.length > 0) {
-					hasSourceFiles = true;
-					for (const sf of player.sourceFiles) {
-						sfLevels[sf.n] = sf.lvl;
-					}
-				}
-
-				let nextBN = null;
-				if (hasSourceFiles) {
-					for (const bn of defaultBnOrder) {
-						const bnNum = Math.floor(bn); // e.g. 4.3 -> 4
-						const sfLevel = sfLevels[bnNum] || 0;
-						if (sfLevel < 3) {
-							nextBn = bn;
-							break;
+					for (const sym of STOCK_SYMBOLS) {
+						const [shares, avgPrice] = ns.stock.getPosition(sym);
+						if (shares > 0) {
+							anyOwned = true;
+							const currentPrice = ns.stock.getPrice(sym);
+							totalValue += shares * currentPrice;
+							totalProfit += shares * (currentPrice - avgPrice);
 						}
 					}
+
+					if (anyOwned) {
+						stockData.push("Stocks");
+						stockData.push(`$${ns.formatNumber(totalValue)} (${totalProfit >= 0 ? "+" : ""}$${ns.formatNumber(totalProfit)})`);
+					} else {
+						stockData.push("Stocks");
+						stockData.push("None held");
+					}
 				} else {
-					nextBN = defaultBnOrder[0]; // No source files, so next BN is the first one
+					stockData.push("Stocks");
+					stockData.push("Access locked");
 				}
-
-				if (nextBN !== null) {
-					headers.push('Next BN Goal');
-					values.push(`BN${nextBN} (SF${Math.floor(nextBN)}.${sfLevels[Math.floor(nextBN)] || 0}/3)`);
-				}
+			} catch (e) {
+				ns.print("⚠ Stock section error: " + String(e));
+				stockData.push("Stocks");
+				stockData.push("Error");
 			}
 
-			// Add script income per second
-			{
-				headers.push('ScrInc');
-				let scrInc = ns.getTotalScriptIncome();
-				values.push(`$${ns.formatNumber(scrInc[0])} / ${ns.formatNumber(scrInc[1])}/sec`);
-			}
+			// --- Current BitNode ---
+			headers.push('BitNode');
+			let bitNode = ns.getResetInfo().currentNode;
+			values.push(`${bitNode}.1`);
 
-			// Add script exp gain rate per second
-			{
-				headers.push('ScrExp');
-				let scrExp = ns.formatNumber(ns.getTotalScriptExpGain(), 3);
-				values.push(`${scrExp}/sec`);
-			}
-
-			// Add server / Ram utilization stats
-			{
-				headers.push('Total Servers');
-				values.push(`${servers.length}`);
-
-				headers.push('Total Rooted');
-				const nRooted = servers.filter(s => s.hasAdminRights).length;
-				values.push(`${nRooted}`);
-
-				const hnServers = servers.filter(s => s.hostname.startsWith("hacknet-server-") || s.hostname.startsWith("hacknet-node-"));
-				const nPurchased = servers.filter(s => s.hostname != "home" && s.purchasedByPlayer).length; // "home" counts as purchased by the game
-				headers.push('Total Purchased');
-				if (hnServers.length > 0) {
-					values.push(`${nPurchased - hnServers.length} servers`);
-					headers.push('Total HNet Servers');
-					values.push(`${hnServers.length} hnet servers`);
-				} else {
-					values.push(`${nPurchased}`);
-				}
-
-				headers.push('Home RAM');
-				const home = servers.find(s => s.hostname == 'home');
-				values.push(`${ns.formatRam(home.maxRam)} ${ns.formatPercent(home.ramUsed / home.maxRam, 1)}`);
-
-				headers.push('All RAM');
-				// If the user has any scripts running on hacknet servers, assume they want them included in the main "total available RAM" stat
-				const includeHacknet = hnServers.some(s => s.ramUsed > 0);
-				const filteredServers = servers.filter(s => s.hasAdminRights && !hnServers.includes(s));
-				const [sMax, sUsed] = filteredServers.reduce(([tMax, tUsed], s) => [tMax + s.maxRam, tUsed + s.ramUsed], [0, 0]);
-				const [hMax, hUsed] = hnServers.reduce(([tMax, tUsed], s) => [tMax + s.maxRam, tUsed + s.ramUsed], [0, 0]);
-				const [tMax, tUsed] = [sMax + hMax, sUsed + hUsed];
-				let statText = includeHacknet ?
-					`${ns.formatRam(tMax)} ${(100 * tUsed / tMax).toFixed(1)}%` :
-					`${ns.formatRam(sMax)} ${(100 * sUsed / sMax).toFixed(1)}%`;
-				values.push(`${statText}`);
-			}
-
-			// Add Share power
-			{
-				const sharePower = ns.getSharePower();
-				if (sharePower > 1.0001) {
-					headers.push('Share Pwr');
-					values.push(`${ns.formatNumber(sharePower, 3)}`);
+			const sfLevels = {};
+			const player = ns.getPlayer();
+			let hasSourceFiles = false;
+			if (player.sourceFiles && player.sourceFiles.length > 0) {
+				hasSourceFiles = true;
+				for (const sf of player.sourceFiles) {
+					sfLevels[sf.n] = sf.lvl;
 				}
 			}
 
-			// Now drop it into the placeholder elements
+			let nextBN = null;
+			if (hasSourceFiles) {
+				for (const bn of defaultBnOrder) {
+					const bnNum = Math.floor(bn);
+					const sfLevel = sfLevels[bnNum] || 0;
+					if (sfLevel < 3) {
+						nextBN = bn;
+						break;
+					}
+				}
+			} else {
+				nextBN = defaultBnOrder[0];
+			}
+
+			if (nextBN !== null) {
+				headers.push('Next BN Goal');
+				values.push(`BN${nextBN} (SF${Math.floor(nextBN)}.${sfLevels[Math.floor(nextBN)] || 0}/3)`);
+			}
+
+			// --- Script income ---
+			headers.push('ScrInc');
+			let scrInc = ns.getTotalScriptIncome();
+			values.push(`$${ns.formatNumber(scrInc[0])} / ${ns.formatNumber(scrInc[1])}/sec`);
+
+			// --- Script exp gain ---
+			headers.push('ScrExp');
+			let scrExp = ns.formatNumber(ns.getTotalScriptExpGain(), 3);
+			values.push(`${scrExp}/sec`);
+
+			// --- Server / RAM stats ---
+			headers.push('Total Servers');
+			values.push(`${servers.length}`);
+
+			headers.push('Total Rooted');
+			const nRooted = servers.filter(s => s.hasAdminRights).length;
+			values.push(`${nRooted}`);
+
+			const hnServers = servers.filter(s => s.hostname.startsWith("hacknet-server-") || s.hostname.startsWith("hacknet-node-"));
+			const nPurchased = servers.filter(s => s.hostname != "home" && s.purchasedByPlayer).length;
+			headers.push('Total Purchased');
+			if (hnServers.length > 0) {
+				values.push(`${nPurchased - hnServers.length} servers`);
+				headers.push('Total HNet Servers');
+				values.push(`${hnServers.length} hnet servers`);
+			} else {
+				values.push(`${nPurchased}`);
+			}
+
+			headers.push('Home RAM');
+			const home = servers.find(s => s.hostname == 'home');
+			values.push(`${ns.formatRam(home.maxRam)} ${ns.formatPercent(home.ramUsed / home.maxRam, 1)}`);
+
+			headers.push('All RAM');
+			const includeHacknet = hnServers.some(s => s.ramUsed > 0);
+			const filteredServers = servers.filter(s => s.hasAdminRights && !hnServers.includes(s));
+			const [sMax, sUsed] = filteredServers.reduce(([tMax, tUsed], s) => [tMax + s.maxRam, tUsed + s.ramUsed], [0, 0]);
+			const [hMax, hUsed] = hnServers.reduce(([tMax, tUsed], s) => [tMax + s.maxRam, tUsed + s.ramUsed], [0, 0]);
+			const [tMax, tUsed] = [sMax + hMax, sUsed + hUsed];
+			let statText = includeHacknet ?
+				`${ns.formatRam(tMax)} ${(100 * tUsed / tMax).toFixed(1)}%` :
+				`${ns.formatRam(sMax)} ${(100 * sUsed / sMax).toFixed(1)}%`;
+			values.push(`${statText}`);
+
+			// --- Share power ---
+			const sharePower = ns.getSharePower();
+			if (sharePower > 1.0001) {
+				headers.push('Share Pwr');
+				values.push(`${ns.formatNumber(sharePower, 3)}`);
+			}
+
+			// --- Debug tick counter ---
+			/*globalThis.__hudTick++;
+			headers.push('Tick');
+			values.push(`${globalThis.__hudTick}`);*/
+
+			// --- Update DOM ---
+			if (stockDisplay && stockDisplay.children.length >= 2 && stockData.length === 2) {
+				stockDisplay.children[0].innerText = stockData[0];
+				stockDisplay.children[1].innerText = stockData[1];
+			}
 			hook0.innerText = headers.join(" \n");
 			hook1.innerText = values.join("\n");
-		} catch (err) { // This might come in handy later
+
+		} catch (err) {
 			ns.print("ERROR: Update Skipped: " + String(err));
 		}
 		await ns.sleep(1000);

@@ -1,4 +1,8 @@
 /** @param {NS} ns */
 export async function main(ns) {
-	await ns.hack(ns.args[0]);
+	try {
+		await ns.hack(ns.args[0]);
+	} catch {
+		ns.toast(`Failed to hack ${ns.args[0]}`, 'error')
+	}
 }

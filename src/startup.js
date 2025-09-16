@@ -25,8 +25,9 @@ export async function main(ns) {
 	const scriptRAM = ns.getScriptRam(script);
 
 	const UPDATE_TARGET_FLAG = '/Temp/update-target.txt';
+	const EXTRA_TARGETS = '/Temp/extra-targets.txt';
 	// Clear out the extra targets file at the start of each run
-	ns.write('/Temp/extra-targets.txt', '', 'w');
+	ns.write(EXTRA_TARGETS, '', 'w');
 
 	ns.disableLog('scan');
 	ns.clearLog();
@@ -44,10 +45,11 @@ export async function main(ns) {
 	for (const server of servers) {
 		const hostName = server.hostname;
 		let serverTarget = target; // Use a local variable
+		let player = ns.getPlayer();
 
 		if (target == 'self') {
 			//ns.tprint(`Server: ${hostName} has ${server.moneyMax}`);
-			if (server.moneyMax > 0) {
+			if (server.moneyMax > 0 && server.hackDifficulty <= player.skills.hacking) {
 				serverTarget = hostName;
 			} else {
 				serverTarget = bestTargets[0].hostname;
@@ -79,7 +81,7 @@ export async function main(ns) {
 				ns.tprint(`ADD TO EXTRA ACTION LIST (${hostName})`);
 				ns.print(`ADD TO EXTRA ACTION LIST (${hostName})`);
 				// Append hostname to extra-targets file
-				ns.write('/Temp/extra-targets.txt', hostName + '\n', 'a');
+				ns.write(EXTRA_TARGETS, hostName + '\n', 'a');
 			}
 			continue;
 		}
@@ -98,7 +100,7 @@ export async function main(ns) {
 	servers = servers.filter(s => s.purchasedByPlayer && s.hostname !== 'home');
 	if (servers.length === 0) return;
 
-	const extraTargets = ns.read('/Temp/extra-targets.txt')
+	const extraTargets = ns.read(EXTRA_TARGETS)
 		.split('\n')
 		.filter(t => t.trim().length > 0);
 	let extraIndex = 0;
@@ -136,5 +138,5 @@ export async function main(ns) {
 
 		await ns.sleep(2_000);
 	}
-	try { ns.rm('/Temp/extra-targets.txt', 'home'); } catch { }
+	try { ns.rm(EXTRA_TARGETS, 'home'); } catch { }
 }

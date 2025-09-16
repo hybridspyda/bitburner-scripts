@@ -16,7 +16,7 @@ export async function main(ns) {
 			if (server.purchasedByPlayer) continue;
 
 			let unlocked = false;
-			let serverInfoGiven = false;
+			let shouldBackdoor = false;
 			// Gain admin on all servers that we can
 			if (!server.hasAdminRights) {
 				if (server.hasAdminRights = sudo(ns, server.hostname)) {
@@ -32,7 +32,8 @@ export async function main(ns) {
 			}
 
 			if (!server.backdoorInstalled && server.requiredHackingSkill <= player.skills.hacking && server.hasAdminRights) {
-				ns.toast(`🚪 Backdoor able to be installed on ${server.hostname} (${server.requiredHackingSkill})!`, "info");
+				shouldBackdoor = true;
+				if (server.moneyMax == 0) ns.toast(`🚪 Backdoor able to be installed on ${server.hostname} (${server.requiredHackingSkill})!`, "info");
 			}
 
 			if (server.moneyMax != 0) {
@@ -60,18 +61,20 @@ export async function main(ns) {
 				ns.print(
 					`${variant}\t${contracts[0] ? "📜" : "  "
 					}${!server.hasAdminRights ? " 🔒" : unlocked ? " 🔑" : "   "
-					}${!server.backdoorInstalled ? "🚪" : "  "
-					}${msg}${msg.length <= 28 ? "\t " : " "}${icon} @ ${server.hostname}`
+					}${shouldBackdoor ? "⛩️" : !server.backdoorInstalled ? "🚪" : "  "
+					}${msg}${msg.length <= 28 ? "\t " : " "}${icon} @ ${server.moneyMax == 0 && !server.purchasedByPlayer ? colorize(ns, server.hostname) : server.hostname}`
 				);
-				serverInfoGiven = true;
+			} else if (!server.purchasedByPlayer) {
+				ns.print(
+					`WARNING\t${contracts[0] ? "📜" : "  "
+					}${!server.hasAdminRights ? " 🔒" : unlocked ? " 🔑" : "   "
+					}${shouldBackdoor ? "⛩️" : !server.backdoorInstalled ? "🚪" : "  "
+					}\t\t\t\t\t    @ ${server.hostname}`
+				);
 			}
 
-			if (!serverInfoGiven) {
-				//ns.print(`Server: ${server.hostname}`);
-				await ns.sleep(1);
-			} else {
-				await ns.sleep(1000);
-			}
+			await ns.sleep(1_000);
 		}
+		await ns.sleep(1);
 	}
 }
