@@ -20,10 +20,9 @@ export async function main(ns) {
 	const minSec = ns.getServerMinSecurityLevel(server);
 	const sec = ns.getServerSecurityLevel(server);
 	ns.tprint(`
-
 ${server}:
-	RAM        : ${ns.formatRAM(usedram)} / ${ns.formatRAM(maxram)} (${ns.formatPercent(maxram / usedram)})
-	$          : $${ns.formatNumber(money, 3)} / $${ns.formatNumber(maxMoney, 3)} (${ns.formatPercent(money / maxMoney)})
+	RAM        : ${ns.formatRam(usedram)} / ${ns.formatRam(maxram)} (${maxram == 0 ? Infinity : ns.formatPercent(usedram / maxram)})
+	$          : $${ns.formatNumber(money, 3)} / $${ns.formatNumber(maxMoney, 3)} (${maxMoney == 0 ? Infinity : ns.formatPercent(money / maxMoney)})
 	security   : ${minSec.toFixed(2)} / ${sec.toFixed(2)}
 	growth     : ${ns.getServerGrowth(server)}
 	hack time  : ${ns.tFormat(ns.getHackTime(server))}
