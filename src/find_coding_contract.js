@@ -44,7 +44,7 @@ export async function main(ns) {
 
 
 			let answer = solve(type, ns.codingcontract.getData(contract, server), ns);
-			if (answer === "") {
+			if (answer === "Not Implemented Yet") {
 				ns.tprint(`   No answer found.`);
 				continue;
 			} else {
@@ -56,8 +56,10 @@ export async function main(ns) {
 			const reward = ns.codingcontract.attempt(answer, contract, server, { returnReward: true });
 			if (reward) {
 				ns.tprint(`   SUCCESS! Reward: ${reward}`);
+				ns.toast(`SUCCESS! Reward: ${reward}`,"success");
 			} else {
-				ns.tprint(`   FAILURE!`);
+				ns.tprint(`   FAILURE! Contract Type: ${type}`);
+				ns.toast(`Failure! Contract Type: ${type}`,"error");
 			}
 		}
 	}
@@ -320,7 +322,7 @@ function solve(contractType, data, ns) {
 		case "Compression I: RLE Compression":
 			{
 				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				return "Not Implemented Yet";
 			}
 		case "Encryption I: Caesar Cipher":
 			{
@@ -473,13 +475,56 @@ function solve(contractType, data, ns) {
 			}
 		case "HammingCodes: Integer to Encoded Binary":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				let value = data;
+				// Calculates the needed amount of parityBits 'without' the "overall"-Parity
+				const HammingSumOfParity = lengthOfDBits => lengthOfDBits == 0 ? 0 : lengthOfDBits < 3 ? lengthOfDBits + 1 :
+					Math.ceil(Math.log2(lengthOfDBits * 2)) <= Math.ceil(Math.log2(1 + lengthOfDBits + Math.ceil(Math.log2(lengthOfDBits)))) ?
+						Math.ceil(Math.log2(lengthOfDBits) + 1) : Math.ceil(Math.log2(lengthOfDBits));
+				const _data = value.toString(2).split(""); // first, change into binary string, then create array with 1 bit per index
+				const sumParity = HammingSumOfParity(_data.length); // get the sum of needed parity bits (for later use in encoding)
+				const count = (arr, val) => arr.reduce((a, v) => (v === val ? a + 1 : a), 0);
+				// function count for specific entries in the array, for later use
+				const build = ["x", "x", ..._data.splice(0, 1)]; // init the "pre-build"
+				for (let i = 2; i < sumParity; i++)
+					build.push("x", ..._data.splice(0, Math.pow(2, i) - 1)); // add new paritybits and the corresponding data bits (pre-building array)
+				// Get the index numbers where the parity bits "x" are placed
+				const parityBits = build.map((e, i) => [e, i]).filter(([e, _]) => e == "x").map(([_, i]) => i);
+				for (const index of parityBits) {
+					const tempcount = index + 1; // set the "stepsize" for the parityBit
+					const temparray = []; // temporary array to store the extracted bits
+					const tempdata = [...build]; // only work with a copy of the build
+					while (tempdata[index] !== undefined) {
+						// as long as there are bits on the starting index, do "cut"
+						const temp = tempdata.splice(index, tempcount * 2); // cut stepsize*2 bits, then...
+						temparray.push(...temp.splice(0, tempcount)); // ... cut the result again and keep the first half
+					}
+					temparray.splice(0, 1); // remove first bit, which is the parity one
+					build[index] = (count(temparray, "1") % 2).toString(); // count with remainder of 2 and"toString" to store the parityBit
+				} // parity done, now the "overall"-parity is set
+				build.unshift((count(build, "1") % 2).toString()); // has to be done as last element
+				return build.join(""); // return the build as string
 			}
 		case "Merge Overlapping Intervals":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				const intervals = data.slice()
+				intervals.sort(function (a, b) {
+					return a[0] - b[0]
+				})
+				const result = []
+				let start = intervals[0][0]
+				let end = intervals[0][1]
+				for (const interval of intervals) {
+					if (interval[0] <= end) {
+						end = Math.max(end, interval[1])
+					} else {
+						result.push([start, end])
+						start = interval[0]
+						end = interval[1]
+					}
+				}
+				result.push([start, end])
+				const sanitizedResult = convert2DArrayToString(result)
+				return sanitizedResult
 			}
 		case "Minimum Path Sum in a Triangle":
 			{
@@ -573,8 +618,87 @@ function solve(contractType, data, ns) {
 			}
 		case "Shortest Path in a Grid":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "";
+				//slightly adapted and simplified to get rid of MinHeap usage, and construct a valid path from potential candidates
+				//MinHeap replaced by simple array acting as queue (breadth first search)
+				const width = data[0].length;
+				const height = data.length;
+				const dstY = height - 1;
+				const dstX = width - 1;
+
+				const distance = new Array(height);
+				//const prev: [[number, number] | undefined][] = new Array(height);
+				const queue = [];
+
+				for (let y = 0; y < height; y++) {
+					distance[y] = new Array(width).fill(Infinity);
+					//prev[y] = new Array(width).fill(undefined) as [undefined];
+				}
+
+				function validPosition(y, x) {
+					return y >= 0 && y < height && x >= 0 && x < width && data[y][x] == 0;
+				}
+
+				// List in-bounds and passable neighbors
+				function* neighbors(y, x) {
+					if (validPosition(y - 1, x)) yield [y - 1, x]; // Up
+					if (validPosition(y + 1, x)) yield [y + 1, x]; // Down
+					if (validPosition(y, x - 1)) yield [y, x - 1]; // Left
+					if (validPosition(y, x + 1)) yield [y, x + 1]; // Right
+				}
+
+				// Prepare starting point
+				distance[0][0] = 0;
+
+				//## Original version
+				// queue.push([0, 0], 0);
+				// // Take next-nearest position and expand potential paths from there
+				//	while (queue.size > 0) {
+				// 		const [y, x] = queue.pop() as [number, number];
+				//			for (const [yN, xN] of neighbors(y, x)) {
+				//				const d = distance[y][x] + 1;
+				//				if (d < distance[yN][xN]) {
+				//					if (distance[yN][xN] == Infinity)
+				//						// Not reached previously
+				//						queue.push([yN, xN], d);
+				//					// Found a shorter path
+				//					else queue.changeWeight(([yQ, xQ]) => yQ == yN && xQ == xN, d);
+				//				//prev[yN][xN] = [y, x];
+				//				distance[yN][xN] = d;
+				//			}
+				//		}
+				//	}
+
+				//Simplified version. d < distance[yN][xN] should never happen for BFS if d != infinity, so we skip changeweight and simplify implementation
+				//algo always expands shortest path, distance != infinity means a <= lenght path reaches it, only remaining case to solve is infinity
+				queue.push([0, 0]);
+				while (queue.length > 0) {
+					const [y, x] = queue.shift()
+					for (const [yN, xN] of neighbors(y, x)) {
+						if (distance[yN][xN] == Infinity) {
+							queue.push([yN, xN])
+							distance[yN][xN] = distance[y][x] + 1
+						}
+					}
+				}
+
+				// No path at all?
+				if (distance[dstY][dstX] == Infinity) return "";
+
+				//trace a path back to start
+				let path = ""
+				let [yC, xC] = [dstY, dstX]
+				while (xC != 0 || yC != 0) {
+					const dist = distance[yC][xC];
+					for (const [yF, xF] of neighbors(yC, xC)) {
+						if (distance[yF][xF] == dist - 1) {
+							path = (xC == xF ? (yC == yF + 1 ? "D" : "U") : (xC == xF + 1 ? "R" : "L")) + path;
+							[yC, xC] = [yF, xF]
+							break
+						}
+					}
+				}
+
+				return path;
 			}
 		case "Spiralize Matrix":
 			{
@@ -722,4 +846,14 @@ function solve(contractType, data, ns) {
 			ns.print(`No solver for contract type '${contractType}'`);
 			return "";
 	}
+}
+
+function convert2DArrayToString(arr) {
+	const components = []
+	arr.forEach(function (e) {
+		let s = e.toString()
+		s = ['[', s, ']'].join('')
+		components.push(s)
+	})
+	return components.join(',').replace(/\s/g, '')
 }

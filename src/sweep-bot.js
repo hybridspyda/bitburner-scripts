@@ -1,7 +1,19 @@
 import { scanAllServers, sudo } from './helpers.js'
 
+const argsSchema = [
+	['autoBackdoor', false],
+];
+
+export function autocomplete(data, _) {
+	data.flags(argsSchema);
+	return [];
+}
+
 /** @param {NS} ns **/
 export async function main(ns) {
+	const options = ns.flags(argsSchema);
+	const autoBackdoor = options.autoBackdoor;
+
 	ns.ui.openTail();
 	ns.disableLog("ALL");
 	ns.clearLog();
@@ -31,10 +43,8 @@ export async function main(ns) {
 				// run contract unlocking?
 			}
 
-			if (!server.backdoorInstalled && server.requiredHackingSkill <= player.skills.hacking && server.hasAdminRights) {
+			if (!server.backdoorInstalled && server.requiredHackingSkill <= player.skills.hacking && server.hasAdminRights)
 				shouldBackdoor = true;
-				if (server.moneyMax == 0) ns.toast(`🚪 Backdoor able to be installed on ${server.hostname} (${server.requiredHackingSkill})!`, "info");
-			}
 
 			if (server.moneyMax != 0) {
 				const moneyThresh = server.moneyMax * 0.8;
@@ -71,6 +81,19 @@ export async function main(ns) {
 					}${shouldBackdoor ? "⛩️" : !server.backdoorInstalled ? "🚪" : "  "
 					}\t\t\t\t\t    @ ${server.hostname}`
 				);
+			}
+			if (autoBackdoor && shouldBackdoor) try {
+				await ns.run('./find_server.js', 1, '--target', server.hostname, '--fast', '--backdoor');
+				ns.print(`INFO\tPausing while backdooring ${server.hostname}...`);
+				while(!server.backdoorInstalled) {
+					server.backdoorInstalled = ns.getServer(server.hostname).backdoorInstalled
+					await ns.sleep(1_000);
+				}
+				ns.print(`SUCCESS\tBackdoor for ${server.hostname} now installed!`);
+			} catch {
+				if (autoBackdoor) {
+					ns.print(`ERROR\tBackdoor for ${server.hostname} failed!`);
+				}
 			}
 
 			await ns.sleep(1_000);

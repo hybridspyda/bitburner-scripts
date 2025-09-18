@@ -1,5 +1,6 @@
 const argsSchema = [
 	['target', ''],
+	['fast', false],
 	['backdoor', false]
 ];
 
@@ -42,17 +43,22 @@ export async function main(ns) {
 		return;
 	}
 	const backdoor = options.backdoor;
+	const fast = options.fast;
 	let route = [];
 
 	recursiveScan(ns, '', 'home', server, route);
-	for (const i in route) {
-		await ns.sleep(250);
-		const extra = i > 0 ? "└ " : "";
-		ns.tprint(`${" ".repeat(i)}${extra}${route[i]}`);
+	if (!fast) {
+		for (const i in route) {
+			await ns.sleep(250);
+			const extra = i > 0 ? "└ " : "";
+			ns.tprint(`${" ".repeat(i)}${extra}${route[i]}`);
+		}
 	}
 	const terminalInput = eval("document.getElementById('terminal-input')");
 	terminalInput.value = `${route.join('; connect ')}; ls${backdoor ? '; backdoor' : ''}`;
 	const handler = Object.keys(terminalInput)[1];
 	terminalInput[handler].onChange({ target: terminalInput });
 	terminalInput[handler].onKeyDown({ key: 'Enter', preventDefault: () => null });
+
+	return terminalInput.value;
 }

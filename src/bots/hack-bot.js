@@ -1,8 +1,9 @@
 /** @param {NS} ns */
 export async function main(ns) {
+	let target = ns.args[0];
 	try {
-		await ns.hack(ns.args[0]);
+		await ns.hack(target);
 	} catch {
-		ns.toast(`Failed to hack ${ns.args[0]}`, 'error')
+		ns.toast(`Failed to hack ${target}`, 'error');
 	}
 }
