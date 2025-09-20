@@ -1,7 +1,7 @@
 let options;
 const argsSchema = [
 	['RAM', 8],
-	['script', 'bot-commander.js'],
+	['script', '/bot-commander.js'],
 	['target', 'n00dles']
 ];
 
@@ -28,7 +28,7 @@ export async function main(ns) {
 	// Continuously try to purchase servers until we've reached the maximum
 	// amount of servers
 	while (i < ns.getPurchasedServerLimit()) {
-		let hostname = "pserv-" + i;
+		let hostname = (i < 10 ? `pserv-0${i}` : `pserv-${i}`);
 		let sExist = ns.serverExists(hostname);
 		let sMaxRam = sExist ? ns.getServerMaxRam(hostname) : 0;
 		if (sExist) {

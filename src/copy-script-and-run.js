@@ -1,8 +1,8 @@
-import { sudo } from './helpers'
+import { sudo } from './bots/sudo-bot.js'
 
 let options;
 const argsSchema = [
-	['script', 'bot-commander.js'],
+	['script', '/bot-commander.js'],
 	['target', 'n00dles'],
 	['threadCount', 1]
 ];

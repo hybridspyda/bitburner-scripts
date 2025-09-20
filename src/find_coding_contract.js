@@ -42,7 +42,6 @@ export async function main(ns) {
 			ns.print(`   ${ns.codingcontract.getDescription(contract, server)}`);
 			ns.print(`   ${ns.codingcontract.getData(contract, server)}`);
 
-
 			let answer = solve(type, ns.codingcontract.getData(contract, server), ns);
 			if (answer === "Not Implemented Yet") {
 				ns.tprint(`   No answer found.`);
@@ -52,14 +51,16 @@ export async function main(ns) {
 			}
 
 			if (!attemptToSolve) continue;
+
+			await ns.sleep(1_000);
 			ns.print(`   Attempting to solve...`);
 			const reward = ns.codingcontract.attempt(answer, contract, server, { returnReward: true });
 			if (reward) {
 				ns.tprint(`   SUCCESS! Reward: ${reward}`);
-				ns.toast(`SUCCESS! Reward: ${reward}`,"success");
+				ns.toast(`SUCCESS! Reward: ${reward}`,"success", 4_000);
 			} else {
 				ns.tprint(`   FAILURE! Contract Type: ${type}`);
-				ns.toast(`Failure! Contract Type: ${type}`,"error");
+				ns.toast(`Failure! Contract Type: ${type}`,"error", 4_000);
 			}
 		}
 	}
@@ -321,8 +322,7 @@ function solve(contractType, data, ns) {
 			}
 		case "Compression I: RLE Compression":
 			{
-				ns.print(`'${contractType}' Not Implemented Yet...`);
-				return "Not Implemented Yet";
+				return data.replace(/([\w])\1{0,8}/g, (group, chr) => group.length + chr)
 			}
 		case "Encryption I: Caesar Cipher":
 			{

@@ -51,58 +51,75 @@ export async function main(ns) {
 		12.9999 // Easy. Keep playing forever. Only stanek scales very well here, there is much work to be done to be able to climb these faster.
 	];
 	const doc = eval("document");
-
+	
 	function tryAddStockRow() {
 		const HUD = doc.querySelector(".MuiCollapse-root");
-		if (!HUD) return false;
+		if (!HUD) {
+			ns.tprint("HUD not available in this environment.");
+			return false;
+		}
 
-		const statblock = HUD.querySelector("[class*='MuiBox-root']");
-		if (!statblock) return false;
+		if (doc.getElementById("stock-display")) {
+			return true;
+		}
 
-		const moneyRow = Array.from(statblock.children)
-			.find(row => row.textContent.trim().toLowerCase().startsWith("money"));
-		if (!moneyRow) return false;
-
-		if (statblock.querySelector("#stock-display")) return true;
-
+		const moneyRow = Array.from(HUD.querySelectorAll("tr"))
+			.find(tr => tr.textContent.trim().toLowerCase().startsWith("money"));
+		if (!moneyRow) {
+			ns.tprint("moneyRow not available in this environment.");
+			return false;
+		}
+		
 		const stockRow = moneyRow.cloneNode(true);
 		stockRow.id = "stock-display";
-		if (stockRow.children.length >= 2) {
-			stockRow.children[0].innerText = "Stocks";
-			stockRow.children[1].innerText = "Loading...";
+		if (stockRow.children.length == 3) {
+			stockRow.childNodes[0].childNodes[0].id = "overview-stock-hook-0";
+			stockRow.childNodes[0].childNodes[0].innerHTML = "Stocks&nbsp;";
+			stockRow.childNodes[1].childNodes[0].id = "overview-stock-hook-1";
+			stockRow.childNodes[1].childNodes[0].innerHTML = "Loading...";
+			stockRow.childNodes[2].childNodes[0].id = "overview-stock-hook-2";
+
+			moneyRow.childNodes[0].style.borderBottom = "none";
+			moneyRow.childNodes[1].style.borderBottom = "none";
+		} else {
+			ns.print(`copy of moneyRow has unexpected children...`);
 		}
 
 		moneyRow.insertAdjacentElement("afterend", stockRow);
 		return true;
 	}
 
-	// Keep trying to insert the stock row in the background
-	setInterval(() => {
-		tryAddStockRow();
-	}, 200);
-
 	// Debug tick counter
-	if (!globalThis.__hudTick) globalThis.__hudTick = 0;
+	//if (!globalThis.__hudTick) globalThis.__hudTick = 0;
 
 	while (true) {
 		try {
 			// Refresh server data each tick
 			const serverNames = scanAllServers(ns);
 			const servers = serverNames.map(ns.getServer);
-
-			const stockDisplay = doc.getElementById('stock-display');
+			
+			const stock0 = doc.getElementById('overview-stock-hook-0');
+			const stock1 = doc.getElementById('overview-stock-hook-1');
 			const hook0 = doc.getElementById('overview-extra-hook-0');
 			const hook1 = doc.getElementById('overview-extra-hook-1');
-
+			
 			if (!hook0 || !hook1) {
 				ns.print("⏳ Waiting for overview hooks...");
 				await ns.sleep(200);
 				continue;
 			}
 
+			if (!stock0 || !stock1) {
+				ns.print("⏳ Waiting for stock display...");
+				tryAddStockRow();
+				await ns.sleep(200);
+				continue;
+			}
+
 			const headers = [];
 			const values = [];
-			const stockData = [];
+			const stockHeaders = [];
+			const stockValues = [];
 
 			// --- Stock Market Status ---
 			try {
@@ -122,27 +139,25 @@ export async function main(ns) {
 					}
 
 					if (anyOwned) {
-						stockData.push("Stocks");
-						stockData.push(`$${ns.formatNumber(totalValue)} (${totalProfit >= 0 ? "+" : ""}$${ns.formatNumber(totalProfit)})`);
+						stockHeaders.push("Stocks");
+						stockValues.push(`$${ns.formatNumber(totalValue)} (${totalProfit >= 0 ? "+" : ""}$${ns.formatNumber(totalProfit)})`);
 					} else {
-						stockData.push("Stocks");
-						stockData.push("None held");
+						stockHeaders.push("Stocks");
+						stockValues.push("None held");
 					}
 				} else {
-					stockData.push("Stocks");
-					stockData.push("Access locked");
+					stockHeaders.push("Stocks");
+					stockValues.push("Access locked");
 				}
 			} catch (e) {
 				ns.print("⚠ Stock section error: " + String(e));
-				stockData.push("Stocks");
-				stockData.push("Error");
+				stockHeaders.push("Stocks");
+				stockValues.push("Error");
 			}
 
-			// --- Current BitNode ---
-			headers.push('BitNode');
+			// --- BitNode Stats ---
 			let bitNode = ns.getResetInfo().currentNode;
-			values.push(`${bitNode}.1`);
-
+			
 			const sfLevels = {};
 			const player = ns.getPlayer();
 			let hasSourceFiles = false;
@@ -152,7 +167,7 @@ export async function main(ns) {
 					sfLevels[sf.n] = sf.lvl;
 				}
 			}
-
+			
 			let nextBN = null;
 			if (hasSourceFiles) {
 				for (const bn of defaultBnOrder) {
@@ -166,6 +181,9 @@ export async function main(ns) {
 			} else {
 				nextBN = defaultBnOrder[0];
 			}
+			
+			headers.push('BitNode');
+			values.push(`${bitNode}.${sfLevels[bitNode] || 0}`);
 
 			if (nextBN !== null) {
 				headers.push('Next BN Goal');
@@ -173,14 +191,30 @@ export async function main(ns) {
 			}
 
 			// --- Script income ---
-			headers.push('ScrInc');
 			let scrInc = ns.getTotalScriptIncome();
-			values.push(`$${ns.formatNumber(scrInc[0])} / ${ns.formatNumber(scrInc[1])}/sec`);
+			headers.push('ScrInc(online)');
+			values.push(`$${ns.formatNumber(scrInc[0])}/sec`);
+			headers.push('ScrInc(offline)')
+			values.push(`$${ns.formatNumber(scrInc[1])}/sec`);
 
 			// --- Script exp gain ---
 			headers.push('ScrExp');
 			let scrExp = ns.formatNumber(ns.getTotalScriptExpGain(), 3);
 			values.push(`${scrExp}/sec`);
+
+			// --- Hacknet income ---
+			let totalHNetProduction = 0;
+			let totalHNetEarned = 0;
+			for (var i = 0; i < ns.hacknet.numNodes(); i++) {
+				let nodeStats = ns.hacknet.getNodeStats(i);
+				totalHNetProduction += nodeStats.production;
+				totalHNetEarned += nodeStats.totalProduction;
+			}
+			//const hashDollarValue = 2.5e5;
+			headers.push('HNetCash');
+			values.push(`$${ns.formatNumber(totalHNetEarned)}`);
+			headers.push('HNetInc');
+			values.push(`$${ns.formatNumber(totalHNetProduction)}/sec`);
 
 			// --- Server / RAM stats ---
 			headers.push('Total Servers');
@@ -229,10 +263,8 @@ export async function main(ns) {
 			values.push(`${globalThis.__hudTick}`);*/
 
 			// --- Update DOM ---
-			if (stockDisplay && stockDisplay.children.length >= 2 && stockData.length === 2) {
-				stockDisplay.children[0].innerText = stockData[0];
-				stockDisplay.children[1].innerText = stockData[1];
-			}
+			stock0.innerText = stockHeaders.join(" \n");
+			stock1.innerText = stockValues.join("\n");
 			hook0.innerText = headers.join(" \n");
 			hook1.innerText = values.join("\n");
 

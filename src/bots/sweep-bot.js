@@ -1,4 +1,5 @@
-import { scanAllServers, sudo } from './helpers.js'
+import { scanAllServers } from '../helpers.js'
+import { sudo } from './sudo-bot.js'
 
 const argsSchema = [
 	['autoBackdoor', false],
@@ -72,7 +73,7 @@ export async function main(ns) {
 					`${variant}\t${contracts[0] ? "📜" : "  "
 					}${!server.hasAdminRights ? " 🔒" : unlocked ? " 🔑" : "   "
 					}${shouldBackdoor ? "⛩️" : !server.backdoorInstalled ? "🚪" : "  "
-					}${msg}${msg.length <= 28 ? "\t " : " "}${icon} @ ${server.moneyMax == 0 && !server.purchasedByPlayer ? colorize(ns, server.hostname) : server.hostname}`
+					}${msg}${msg.length <= 29 ? "\t " : " "}${icon} @ ${server.moneyMax == 0 && !server.purchasedByPlayer ? colorize(ns, server.hostname) : server.hostname}`
 				);
 			} else if (!server.purchasedByPlayer) {
 				ns.print(
@@ -83,7 +84,7 @@ export async function main(ns) {
 				);
 			}
 			if (autoBackdoor && shouldBackdoor) try {
-				await ns.run('./find_server.js', 1, '--target', server.hostname, '--fast', '--backdoor');
+				await ns.run('../find_server.js', 1, '--target', server.hostname, '--fast', '--backdoor');
 				ns.print(`INFO\tPausing while backdooring ${server.hostname}...`);
 				while(!server.backdoorInstalled) {
 					server.backdoorInstalled = ns.getServer(server.hostname).backdoorInstalled

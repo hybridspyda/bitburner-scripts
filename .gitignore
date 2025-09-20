@@ -2,6 +2,8 @@ src/*.txt
 src/!alias-commands.txt
 .vscode/*.*
 src/*.ts
+src/bots/casino-bot.js
+src/bots/go-bot.js
 
 node_modules/
 dist/

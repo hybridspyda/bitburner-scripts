@@ -88,14 +88,14 @@ export async function main(ns) {
 			 */
 		} else {
 			if (ns.getServerSecurityLevel(target) > securityThresh) {
-				if (bots.weakBot.threadCount > 0)
-					ns.run(bots.weakBot.script, bots.weakBot.threadCount, target);
+				if (bots.weakBot.threadCount > 0 && !ns.isRunning(bots.weakBot.script, hostName))
+					await ns.run(bots.weakBot.script, bots.weakBot.threadCount, target);
 			} else if (ns.getServerMoneyAvailable(target) < moneyThresh) {
-				if (bots.growBot.threadCount > 0)
-					ns.run(bots.growBot.script, bots.growBot.threadCount, target);
+				if (bots.growBot.threadCount > 0 && !ns.isRunning(bots.growBot.script, hostName))
+					await ns.run(bots.growBot.script, bots.growBot.threadCount, target);
 			} else {
-				if (bots.hackBot.threadCount > 0)
-					ns.run(bots.hackBot.script, bots.hackBot.threadCount, target);
+				if (bots.hackBot.threadCount > 0 && !ns.isRunning(bots.hackBot.script, hostName))
+					await ns.run(bots.hackBot.script, bots.hackBot.threadCount, target);
 			}
 		}
 		await ns.sleep(200);

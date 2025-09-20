@@ -4,8 +4,13 @@ export async function main(ns) {
 	//const OUTPUT = '/Temp/test-output.txt';
 	//ns.write(OUTPUT, `${ns.stock.getSymbols()}`, 'w');
 
-	ns.ui.openTail();
-	ns.disableLog('sleep');
+	let hostname = ns.args[0];
+
+	ns.killall(hostname);
+	ns.deleteServer(hostname);
+
+	/*ns.ui.openTail();
+	ns.disableLog('sleep');*/
 
 	/*let char;
 	while(true) {
@@ -25,7 +30,7 @@ export async function main(ns) {
 	}*/
 
 	// Phase 1: Loading animation
-	for (let p = 0; p <= 100; p += 1) {
+	/*for (let p = 0; p <= 100; p += 1) {
 		ns.clearLog();
 		ns.print("🚀 Initialising Bot Commander Army...");
 		ns.print(progressBar(p));
@@ -58,12 +63,12 @@ export async function main(ns) {
 
 	ns.clearLog();
 	ns.print(explosion[0]);
-	ns.print("\n" + explosion[1]);
+	ns.print("\n" + explosion[1]);*/
 
 
 }
 
-function loadingWheel(currentPos) {
+/*function loadingWheel(currentPos) {
 	const symbol = ['🕛','🕐','🕑','🕒','🕓','🕔','🕕','🕖','🕗','🕘','🕙','🕚'];
 	const idx = currentPos ? (symbol.indexOf(currentPos) + 1) % symbol.length : 0;
 	return symbol[idx];
@@ -110,4 +115,4 @@ function progressBar(percent) {
 	const filledBars = Math.floor((percent / 100) * totalBars);
 	const emptyBars = totalBars - filledBars;
 	return `[${'█'.repeat(filledBars)}${' '.repeat(emptyBars)}] ${percent.toFixed(0)}%`;
-}
+}*/

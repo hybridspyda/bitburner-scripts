@@ -1,10 +1,12 @@
-import { scanAllServers, sudo } from './helpers.js'
+import { scanAllServers } from './helpers.js'
+import { sudo } from './bots/sudo-bot.js'
 
 let options;
 const argsSchema = [
 	['target', 'self'],
-	['script', 'bot-commander.js'],
-	['threadCount', 1]
+	['script', '/bot-commander.js'],
+	['threadCount', 1],
+	['runGo', false]
 ];
 
 export function autocomplete(data, args) {
@@ -34,6 +36,9 @@ export async function main(ns) {
 
 	if (!ns.scriptRunning('custom-stats.js', 'home'))
 		ns.run('./custom-stats.js');
+
+	if (!ns.scriptRunning('/bots/go-bot.js', 'home') && options.runGo)
+		ns.run('./bots/go-bot.js');
 
 	let serverNames = [""]; // Provide a type hint to the IDE
 	serverNames = scanAllServers(ns);
