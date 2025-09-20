@@ -1,13 +1,16 @@
 
 /** @param {NS} ns */
 export async function main(ns) {
+	
+	getHacknetMoney(ns);
+
 	//const OUTPUT = '/Temp/test-output.txt';
 	//ns.write(OUTPUT, `${ns.stock.getSymbols()}`, 'w');
 
-	let hostname = ns.args[0];
+	//let hostname = ns.args[0];
 
-	ns.killall(hostname);
-	ns.deleteServer(hostname);
+	//ns.killall(hostname);
+	//ns.deleteServer(hostname);
 
 	/*ns.ui.openTail();
 	ns.disableLog('sleep');*/
@@ -116,3 +119,16 @@ function progressBar(percent) {
 	const emptyBars = totalBars - filledBars;
 	return `[${'█'.repeat(filledBars)}${' '.repeat(emptyBars)}] ${percent.toFixed(0)}%`;
 }*/
+
+function getHacknetMoney(ns) {
+	const m = ns.getMoneySources();
+
+  const spentInstall = m.sinceInstall.hacknet_expenses ?? 0;
+  const producedInstall = m.sinceInstall.hacknet ?? 0;
+
+  const spentStart = m.sinceStart.hacknet_expenses ?? 0;
+  const producedStart = m.sinceStart.hacknet ?? 0;
+
+  ns.tprint(`Hacknet (since install): Spent $${ns.formatNumber(spentInstall)}, Produced $${ns.formatNumber(producedInstall)}`);
+  ns.tprint(`Hacknet (since BN start): Spent $${ns.formatNumber(spentStart)}, Produced $${ns.formatNumber(producedStart)}`);
+}

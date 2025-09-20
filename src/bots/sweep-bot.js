@@ -91,6 +91,11 @@ export async function main(ns) {
 					await ns.sleep(1_000);
 				}
 				ns.print(`SUCCESS\tBackdoor for ${server.hostname} now installed!`);
+				const terminalInput = eval("document.getElementById('terminal-input')");
+				terminalInput.value = 'home';
+				const handler = Object.keys(terminalInput)[1];
+				terminalInput[handler].onChange({ target: terminalInput });
+				terminalInput[handler].onKeyDown({ key: 'Enter', preventDefault: () => null });
 			} catch {
 				if (autoBackdoor) {
 					ns.print(`ERROR\tBackdoor for ${server.hostname} failed!`);

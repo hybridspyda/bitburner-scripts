@@ -8,3 +8,5 @@ src/bots/go-bot.js
 node_modules/
 dist/
 NetscriptDefinitions.d.ts
+
+src/exploits/

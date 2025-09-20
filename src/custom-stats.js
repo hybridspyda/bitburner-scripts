@@ -1,4 +1,4 @@
-import { scanAllServers, STOCK_SYMBOLS } from './helpers.js';
+import { scanAllServers, STOCK_SYMBOLS, formatDateTime } from './helpers.js';
 
 /** @param {NS} ns **/
 export async function main(ns) {
@@ -51,7 +51,7 @@ export async function main(ns) {
 		12.9999 // Easy. Keep playing forever. Only stanek scales very well here, there is much work to be done to be able to climb these faster.
 	];
 	const doc = eval("document");
-	
+
 	function tryAddStockRow() {
 		const HUD = doc.querySelector(".MuiCollapse-root");
 		if (!HUD) {
@@ -69,7 +69,7 @@ export async function main(ns) {
 			ns.tprint("moneyRow not available in this environment.");
 			return false;
 		}
-		
+
 		const stockRow = moneyRow.cloneNode(true);
 		stockRow.id = "stock-display";
 		if (stockRow.children.length == 3) {
@@ -97,12 +97,12 @@ export async function main(ns) {
 			// Refresh server data each tick
 			const serverNames = scanAllServers(ns);
 			const servers = serverNames.map(ns.getServer);
-			
+
 			const stock0 = doc.getElementById('overview-stock-hook-0');
 			const stock1 = doc.getElementById('overview-stock-hook-1');
 			const hook0 = doc.getElementById('overview-extra-hook-0');
 			const hook1 = doc.getElementById('overview-extra-hook-1');
-			
+
 			if (!hook0 || !hook1) {
 				ns.print("⏳ Waiting for overview hooks...");
 				await ns.sleep(200);
@@ -121,9 +121,13 @@ export async function main(ns) {
 			const stockHeaders = [];
 			const stockValues = [];
 
+			const hasWSEAccount = ns.stock.hasWSEAccount();
+			const hasTIXAPIAccess = ns.stock.hasTIXAPIAccess();
+			const has4SDataTIXAPI = ns.stock.has4SDataTIXAPI();
+
 			// --- Stock Market Status ---
 			try {
-				if (ns.stock.hasWSEAccount() && ns.stock.hasTIXAPIAccess()) {
+				if (hasWSEAccount && hasTIXAPIAccess && has4SDataTIXAPI) {
 					let totalValue = 0;
 					let totalProfit = 0;
 					let anyOwned = false;
@@ -147,7 +151,13 @@ export async function main(ns) {
 					}
 				} else {
 					stockHeaders.push("Stocks");
-					stockValues.push("Access locked");
+					if (!hasWSEAccount) {
+						stockValues.push("Need WSE Account");
+					} else if (!hasTIXAPIAccess) {
+						stockValues.push("Need TIX API ($5b)");
+					} else if (!has4SDataTIXAPI) {
+						stockValues.push("Need 4S Data ($25b)");
+					}
 				}
 			} catch (e) {
 				ns.print("⚠ Stock section error: " + String(e));
@@ -157,7 +167,7 @@ export async function main(ns) {
 
 			// --- BitNode Stats ---
 			let bitNode = ns.getResetInfo().currentNode;
-			
+
 			const sfLevels = {};
 			const player = ns.getPlayer();
 			let hasSourceFiles = false;
@@ -167,7 +177,7 @@ export async function main(ns) {
 					sfLevels[sf.n] = sf.lvl;
 				}
 			}
-			
+
 			let nextBN = null;
 			if (hasSourceFiles) {
 				for (const bn of defaultBnOrder) {
@@ -181,7 +191,7 @@ export async function main(ns) {
 			} else {
 				nextBN = defaultBnOrder[0];
 			}
-			
+
 			headers.push('BitNode');
 			values.push(`${bitNode}.${sfLevels[bitNode] || 0}`);
 
@@ -210,11 +220,23 @@ export async function main(ns) {
 				totalHNetProduction += nodeStats.production;
 				totalHNetEarned += nodeStats.totalProduction;
 			}
-			//const hashDollarValue = 2.5e5;
+			const m = ns.getMoneySources();
+			const totalHNetSpent = m.sinceInstall.hacknet_expenses ?? 0;
+			let totalHNetProfit = totalHNetSpent + totalHNetEarned;
+			let timeForHNetRecovery = (-totalHNetProfit / totalHNetProduction) * 1_000;
+
+			headers.push('HNetCost');
+			values.push(`$${ns.formatNumber(-totalHNetSpent)}`);
 			headers.push('HNetCash');
 			values.push(`$${ns.formatNumber(totalHNetEarned)}`);
+			headers.push('HNetProfit');
+			values.push(`$${ns.formatNumber(totalHNetProfit)}`);
 			headers.push('HNetInc');
 			values.push(`$${ns.formatNumber(totalHNetProduction)}/sec`);
+			if (totalHNetProfit < 0) {
+				headers.push('HNetRecvrT');
+				values.push(`${ns.tFormat(timeForHNetRecovery)}`);
+			}
 
 			// --- Server / RAM stats ---
 			headers.push('Total Servers');

@@ -7,7 +7,12 @@ import { STOCK_SYMBOLS } from "../helpers.js";
 export async function main(ns) {
 	ns.disableLog("ALL");
 	ns.clearLog();
-	if (ns.ui?.openTail) ns.ui.openTail(); else ns.tail();
+	ns.ui.openTail();
+
+	if (!ns.stock.hasWSEAccount() || !ns.stock.hasTIXAPIAccess() || !ns.stock.has4SDataTIXAPI()) {
+		ns.tprint(`Stocks not yet unlocked, exiting.`);
+		return;
+	}
 
 	// === Core Config ===
 	const LONG_BUY_THRESHOLD = 0.6;
